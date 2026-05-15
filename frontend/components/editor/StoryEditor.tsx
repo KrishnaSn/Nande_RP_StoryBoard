@@ -1,18 +1,16 @@
 'use client'
 
-import { useCallback, useState } from 'react'
-
+import { useRef, useCallback, useEffect } from 'react'
 import ReactFlow, {
-  addEdge,
   Background,
   Controls,
   MiniMap,
-  useEdgesState,
-  useNodesState,
+  useReactFlow,
+  ReactFlowProvider
 } from 'reactflow'
+import useKeypress from 'react-use-keypress'
 
 import 'reactflow/dist/style.css'
-
 import '../styles/storyflow.css'
 
 import SceneNode from '../nodes/SceneNode'
@@ -20,9 +18,12 @@ import DialogueNode from '../nodes/DialogueNode'
 import ChoiceNode from '../nodes/ChoiceNode'
 import CharacterNode from '../nodes/CharacterNode'
 
+import TopBar from '../panels/TopBar'
 import LeftToolbox from '../panels/LeftToolbox'
 import RightInspector from '../panels/RightInspector'
 import EpisodeTimeline from '../timeline/EpisodeTimeline'
+
+import { useStoryStore } from '../../store/useStoryStore'
 
 const nodeTypes = {
   scene: SceneNode,
@@ -30,152 +31,158 @@ const nodeTypes = {
   choice: ChoiceNode,
   character: CharacterNode,
 }
+function FlowEditor() {
+  const reactFlowWrapper = useRef<any>(null)
+  const { 
+    getNodes, 
+    getEdges,
+    onNodesChange, 
+    onEdgesChange, 
+    onConnect, 
+    setSelectedNode,
+    selectedNode,
+    deleteNode,
+    addNode,
+    loadEpisodes
+  } = useStoryStore()
 
-const initialNodes = [
-  {
-    id: '1',
-    type: 'scene',
-    position: {
-      x: 200,
-      y: 200,
+  const nodes = getNodes()
+  const edges = getEdges()
+
+  useEffect(() => {
+    loadEpisodes()
+  }, [loadEpisodes])
+
+  const { project } = useReactFlow()
+  const temporal = useStoryStore.temporal
+  const { undo, redo } = temporal.getState()
+
+  // Drag & Drop Handling
+  const onDragOver = useCallback((event: any) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }, [])
+
+  const onDrop = useCallback(
+    (event: any) => {
+      event.preventDefault()
+
+      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect()
+      const type = event.dataTransfer.getData('application/reactflow')
+      const characterDataStr = event.dataTransfer.getData('application/character-data')
+
+      if (!type) return
+
+      const position = project({
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top,
+      })
+
+      const initialData = characterDataStr ? JSON.parse(characterDataStr) : null
+      addNode(type, position, initialData)
     },
-
-    data: {
-      title: 'Michael Returns',
-      description:
-        'Michael returns after prison.',
-      image:
-        'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop',
-
-      characters: ['Michael', 'Tony'],
-    },
-  },
-]
-
-const initialEdges = []
-
-export default function StoryEditor() {
-  const [nodes, setNodes, onNodesChange] =
-    useNodesState(initialNodes)
-
-  const [edges, setEdges, onEdgesChange] =
-    useEdgesState(initialEdges)
-
-  const [selectedNode, setSelectedNode] =
-    useState<any>(null)
-
-  const onConnect = useCallback(
-    (params: any) =>
-      setEdges((eds) =>
-        addEdge(
-          {
-            ...params,
-            animated: true,
-            style: {
-              stroke: '#ef4444',
-              strokeWidth: 3,
-            },
-          },
-          eds
-        )
-      ),
-    [setEdges]
+    [project, addNode]
   )
 
-  const addNode = (type: string) => {
-    const id = `${nodes.length + 1}`
-
-    let nodeData: any = {}
-
-    if (type === 'scene') {
-      nodeData = {
-        title: 'New Scene',
-        description:
-          'Scene description...',
-        image:
-          'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=1200&auto=format&fit=crop',
-
-        characters: ['Michael'],
-      }
+  // Keyboard Shortcuts
+  useKeypress(['Delete', 'Backspace'], () => {
+    if (selectedNode) {
+      deleteNode(selectedNode.id)
     }
+  })
 
-    if (type === 'dialogue') {
-      nodeData = {
-        character: 'Michael',
-        dialogue:
-          'We need to finish this tonight.',
-      }
+  useKeypress(['z', 'Z'], (event: any) => {
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey) {
+      undo()
+    } else if ((event.ctrlKey || event.metaKey) && event.shiftKey) {
+      redo()
     }
+  })
 
-    if (type === 'choice') {
-      nodeData = {
-        question: 'Trust Tony?',
-        options: ['YES', 'NO'],
-      }
+  const nodeColor = (node: any) => {
+    switch (node.type) {
+      case 'scene': return '#10b981'
+      case 'dialogue': return '#3b82f6'
+      case 'choice': return '#f59e0b'
+      case 'character': return '#ef4444'
+      default: return '#27272a'
     }
+  }
 
-    if (type === 'character') {
-      nodeData = {
-        name: 'Tony',
-        role: 'Gang Leader',
-        personality:
-          'Aggressive and unpredictable.',
-
-        image:
-          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=1200&auto=format&fit=crop',
-      }
+  const nodeStrokeColor = (node: any) => {
+    switch (node.type) {
+      case 'scene': return '#059669'
+      case 'dialogue': return '#2563eb'
+      case 'choice': return '#d97706'
+      case 'character': return '#dc2626'
+      default: return '#3f3f46'
     }
-
-    const newNode = {
-      id,
-      type,
-      position: {
-        x: Math.random() * 800,
-        y: Math.random() * 600,
-      },
-
-      data: nodeData,
-    }
-
-    setNodes((nds) => [...nds, newNode])
   }
 
   return (
-    <div className="flex h-screen bg-[#090909] text-white">
-      <LeftToolbox addNode={addNode} />
-
-      <div className="flex flex-1 flex-col">
-        <div className="flex-1">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onConnect={onConnect}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onNodeClick={(_, node) =>
-              setSelectedNode(node)
-            }
-            fitView
-          >
-            <Background gap={30} />
-            <Controls />
-
-            <MiniMap
-              style={{
-                backgroundColor: '#111',
-              }}
-              nodeColor="#ef4444"
-            />
-          </ReactFlow>
-        </div>
-
-        <EpisodeTimeline />
-      </div>
-
-      <RightInspector
-        selectedNode={selectedNode}
-      />
+    <div className="flex-1 relative" ref={reactFlowWrapper}>
+      <div className="ui-tag">[GRAPH_WORKSPACE]</div>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onConnect={onConnect}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={(_, node) => setSelectedNode(node)}
+        onPaneClick={() => setSelectedNode(null)}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        fitView
+        snapToGrid={true}
+        snapGrid={[15, 15]}
+      >
+        <Background />
+        <Controls />
+        <MiniMap 
+          nodeColor={nodeColor}
+          nodeStrokeColor={nodeStrokeColor}
+          nodeStrokeWidth={5}
+          nodeBorderRadius={4}
+          maskColor="rgba(0, 0, 0, 0.4)"
+          style={{
+            backgroundColor: '#0d0d0d',
+            borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.05)',
+            width: 200,
+            height: 150
+          }}
+          zoomable
+          pannable
+        />
+      </ReactFlow>
     </div>
+  )
+}
+
+export default function StoryEditor() {
+  return (
+    <ReactFlowProvider>
+      <div className="flex flex-col h-screen bg-[#050505] text-white selection:bg-red-500/30">
+        <TopBar />
+        
+        <div className="flex flex-1 overflow-hidden">
+          <LeftToolbox />
+
+          <main className="flex-1 relative flex flex-col overflow-hidden">
+            <FlowEditor />
+            <EpisodeTimeline />
+            <div className="absolute bottom-36 right-6 z-30 pointer-events-none">
+               <div className="bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Build 1.0.0 Stable</span>
+               </div>
+            </div>
+          </main>
+
+          <RightInspector />
+        </div>
+      </div>
+    </ReactFlowProvider>
   )
 }
