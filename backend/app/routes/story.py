@@ -82,11 +82,11 @@ def lock_arc(arc_id: str, req: LockRequest, db: Session = Depends(get_db)):
     if not db_arc:
         raise HTTPException(status_code=404, detail="Arc not found")
     
-    # Check if lock is expired (e.g. 1 hour)
+    # Lock expires if no heartbeat for 60 seconds
     is_expired = False
     if db_arc.locked_at:
         delta = datetime.utcnow() - db_arc.locked_at
-        if delta.total_seconds() > 3600:
+        if delta.total_seconds() > 60:
             is_expired = True
 
     if db_arc.locked_by and db_arc.locked_by != req.user_id and not is_expired:

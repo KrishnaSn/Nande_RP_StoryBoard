@@ -96,19 +96,24 @@ function FlowEditor() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [nodes, deleteNode, lockedBy, userId, handleInteraction, isPresenting, togglePresentMode])
 
-  // Initial load & Polling for Locks/Sync
+  // Initial load, Polling for Locks/Sync, and Heartbeat
   useEffect(() => {
     loadArcs()
-    // Poll for lock status and others' changes every 8 seconds
+    
     const interval = setInterval(() => {
-      // Only refresh if we haven't locked it ourselves (to avoid overwriting local changes)
+      // HEARTBEAT: If WE hold the lock, refresh it every 30s to keep it alive
+      if (lockedBy === userId && currentArcId) {
+        acquireLock(currentArcId)
+      }
+      
+      // SYNC: Only refresh from cloud if we DON'T hold the lock
       if (!lockedBy || lockedBy !== userId) {
         loadArcs()
       }
     }, 8000)
 
     return () => clearInterval(interval)
-  }, [loadArcs, lockedBy, userId])
+  }, [loadArcs, lockedBy, userId, currentArcId, acquireLock])
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
