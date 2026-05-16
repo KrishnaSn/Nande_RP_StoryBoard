@@ -23,13 +23,19 @@ export default function TopBar() {
     <header className="h-14 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between px-6 z-20 relative">
       <div className="ui-tag">[GLOBAL_TOP_NAV]</div>
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-red-500 flex items-center justify-center">
-            <span className="text-white font-black text-lg italic">N</span>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 shadow-lg shadow-red-500/10">
+            <img src="/logo.jpg" alt="Nande RP Logo" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-lg font-bold tracking-tight text-white">
-            Nande <span className="text-zinc-500 font-medium">StoryBoard</span>
-          </h1>
+          <div>
+            <h1 className="text-sm font-black tracking-[0.2em] text-white uppercase italic">
+              Nande RP <span className="text-red-500 not-italic">StoryBoard</span>
+            </h1>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Cinematic Mode Active</span>
+            </div>
+          </div>
         </div>
         
         <div className="h-4 w-px bg-white/10" />
