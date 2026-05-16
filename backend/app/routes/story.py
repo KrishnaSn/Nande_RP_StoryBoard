@@ -73,6 +73,15 @@ def update_episode(episode_id: str, ep_update: EpisodeUpdate, db: Session = Depe
     db_ep.edges = json.loads(db_ep.edges)
     return db_ep
 
+@router.delete("/episodes/{episode_id}")
+def delete_episode(episode_id: str, db: Session = Depends(get_db)):
+    db_ep = db.query(EpisodeModel).filter(EpisodeModel.id == episode_id).first()
+    if not db_ep:
+        raise HTTPException(status_code=404, detail="Episode not found")
+    db.delete(db_ep)
+    db.commit()
+    return {"message": "Episode deleted successfully"}
+
 @router.get("/characters", response_model=list[CharacterAsset])
 def get_characters(db: Session = Depends(get_db)):
     return db.query(CharacterAssetModel).all()

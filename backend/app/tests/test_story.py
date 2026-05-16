@@ -87,6 +87,21 @@ def test_update_episode():
     assert len(data["nodes"]) == 1
     assert data["nodes"][0]["id"] == "node-1"
 
+def test_delete_episode():
+    # Create episode
+    client.post(
+        "/api/episodes",
+        json={"id": "delete-me", "title": "To Delete", "description": "Desc"}
+    )
+    # Delete it
+    response = client.delete("/api/episodes/delete-me")
+    assert response.status_code == 200
+    assert response.json()["message"] == "Episode deleted successfully"
+    # Verify it's gone
+    get_res = client.get("/api/episodes")
+    episodes = get_res.json()
+    assert not any(ep["id"] == "delete-me" for ep in episodes)
+
 def test_create_character():
     response = client.post(
         "/api/characters",
