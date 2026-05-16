@@ -70,4 +70,31 @@ describe('StoryStore', () => {
     expect(cinematicNodes.length).toBe(1)
     expect(cinematicNodes[0].type).toBe('scene')
   })
+
+  it('should delete a character asset and its associated nodes', async () => {
+    const { saveCharacterAsset, addNode, deleteCharacterAsset } = useStoryStore.getState()
+    
+    // Mock fetch
+    global.fetch = vi.fn().mockResolvedValue({ 
+      ok: true, 
+      json: () => Promise.resolve({ id: 'char-1', name: 'Test', image: 'test.jpg' }) 
+    })
+
+    // Add character asset
+    await saveCharacterAsset({ id: 'char-1', name: 'Test', image: 'test.jpg' })
+    
+    // Add a node for this character
+    addNode('character', { x: 0, y: 0 }, { name: 'Test' })
+    
+    let state = useStoryStore.getState()
+    expect(state.characterAssets.length).toBe(1)
+    expect(state.getNodes().length).toBe(1)
+
+    // Delete character
+    await deleteCharacterAsset('char-1')
+    
+    state = useStoryStore.getState()
+    expect(state.characterAssets.length).toBe(0)
+    expect(state.getNodes().length).toBe(0)
+  })
 })

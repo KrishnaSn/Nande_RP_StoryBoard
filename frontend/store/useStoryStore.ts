@@ -72,6 +72,7 @@ interface StoryState {
   // Character Asset Actions
   addCharacterAsset: (asset: CharacterAsset) => void
   saveCharacterAsset: (asset: CharacterAsset) => Promise<boolean>
+  deleteCharacterAsset: (id: string) => Promise<void>
   uploadImage: (file: File) => Promise<string>
   loadCharacters: () => Promise<void>
 
