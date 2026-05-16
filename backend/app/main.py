@@ -40,4 +40,14 @@ app.include_router(story_router, prefix="/api")
 
 @app.get("/")
 def root():
-    return {"message": "FiveM Story Engine Backend Running"}
+    return {
+        "status": "online",
+        "message": "Nande RP StoryBoard Backend is running",
+        "environment": os.getenv("ENVIRONMENT", "production")
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    # This part is a backup for local testing, Render uses the Start Command
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
