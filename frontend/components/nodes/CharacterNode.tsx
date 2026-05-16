@@ -19,9 +19,10 @@ export default function CharacterNode({ data, selected }: any) {
       <div className="relative">
         <img
           src={data.image}
-          className="h-32 w-full object-cover opacity-60 grayscale hover:grayscale-0 transition-all duration-500"
+          className="h-32 w-full object-cover transition-all duration-500"
+          onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=1200&auto=format&fit=crop' }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0d] to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0d] via-transparent to-transparent opacity-60" />
       </div>
 
       <div className="px-4 pb-4 -mt-6 relative z-10">

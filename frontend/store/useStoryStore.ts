@@ -577,6 +577,56 @@ export const useStoryStore = create<StoryState>()(
       set({ characterAssets: [...get().characterAssets, asset] })
     },
 
+    deleteCharacterAsset: async (id: string) => {
+      const { characterAssets, episodeGraphs, currentEpisodeId, saveCurrentEpisode } = get()
+      
+      // 1. Remove from moodboard
+      set({ characterAssets: characterAssets.filter(c => c.id !== id) })
+      
+      // 2. Remove any nodes in the graph that belong to this character
+      // We look for 'character' nodes where the ID or Name matches
+      const charToDelete = characterAssets.find(c => c.id === id)
+      
+      const newGraphs = { ...episodeGraphs }
+      let changed = false
+
+      Object.keys(newGraphs).forEach(epId => {
+        const graph = newGraphs[epId]
+        const filteredNodes = graph.nodes.filter(node => {
+          // If it's a character node and matches the asset ID
+          if (node.type === 'character' && (node.id === id || node.data.name === charToDelete?.name)) {
+            changed = true
+            return false
+          }
+          return true
+        })
+
+        if (filteredNodes.length !== graph.nodes.length) {
+          newGraphs[epId] = {
+            ...graph,
+            nodes: filteredNodes,
+            edges: graph.edges.filter(edge => 
+              filteredNodes.some(n => n.id === edge.source) && 
+              filteredNodes.some(n => n.id === edge.target)
+            )
+          }
+        }
+      })
+
+      if (changed) {
+        set({ episodeGraphs: newGraphs })
+        saveCurrentEpisode()
+      }
+
+      // 3. Delete from backend
+      try {
+        await fetch(`${API_URL}/characters/${id}`, { method: 'DELETE' })
+        console.log('✅ StoryBoard: Character asset deleted from backend.')
+      } catch (error) {
+        console.error('❌ StoryBoard: Failed to delete character from backend:', error)
+      }
+    },
+
     setLayer: (layer: string) => {
       set({ currentLayer: layer })
     }

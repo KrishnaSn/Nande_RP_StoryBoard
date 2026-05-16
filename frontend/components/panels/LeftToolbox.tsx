@@ -21,7 +21,7 @@ import { useReactFlow } from 'reactflow'
 import { nanoid } from 'nanoid'
 
 export default function LeftToolbox() {
-  const { addNode, characterAssets, currentLayer, setLayer, saveCharacterAsset, uploadImage } = useStoryStore()
+  const { addNode, characterAssets, currentLayer, setLayer, saveCharacterAsset, deleteCharacterAsset, uploadImage } = useStoryStore()
   const { project } = useReactFlow()
   
   const [showCharModal, setShowCharModal] = useState(false)
@@ -151,7 +151,7 @@ export default function LeftToolbox() {
             {characterAssets.map((asset) => (
               <div 
                 key={asset.id} 
-                className="group relative aspect-square rounded-lg overflow-hidden border border-white/5 cursor-grab active:cursor-grabbing hover:border-red-500/50 transition-colors"
+                className="group relative aspect-square rounded-lg overflow-hidden border border-white/5 cursor-grab active:cursor-grabbing hover:border-red-500/50 transition-colors bg-black"
                 title={asset.name}
                 draggable
                 onDragStart={(e) => {
@@ -177,8 +177,26 @@ export default function LeftToolbox() {
                   })
                 }}
               >
-                <img src={asset.image} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-1.5">
+                <img 
+                  src={asset.image} 
+                  className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" 
+                  onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop' }}
+                />
+                
+                {/* Delete button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (confirm(`Delete character "${asset.name}"?`)) {
+                      deleteCharacterAsset(asset.id)
+                    }
+                  }}
+                  className="absolute top-1 right-1 p-1 rounded bg-black/60 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all z-10"
+                >
+                  <X size={10} />
+                </button>
+
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-1.5">
                   <span className="text-[8px] font-bold text-white truncate">{asset.name}</span>
                 </div>
               </div>

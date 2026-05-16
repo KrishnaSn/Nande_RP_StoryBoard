@@ -159,15 +159,13 @@ function FlowEditor() {
         <MiniMap 
           nodeColor={nodeColor}
           nodeStrokeColor={nodeStrokeColor}
-          nodeStrokeWidth={5}
-          nodeBorderRadius={4}
-          maskColor="rgba(0, 0, 0, 0.4)"
+          nodeStrokeWidth={3}
+          nodeBorderRadius={2}
+          maskColor="rgba(0, 0, 0, 0.6)"
+          className="!bg-[#0d0d0d] !rounded-xl !border !border-white/10 !m-4 !shadow-2xl !shadow-black/50"
           style={{
-            backgroundColor: '#0d0d0d',
-            borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.05)',
-            width: 200,
-            height: 150
+            width: 180,
+            height: 120
           }}
           zoomable
           pannable

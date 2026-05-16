@@ -90,3 +90,12 @@ def create_character(char: CharacterAsset, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_char)
     return db_char
+
+@router.delete("/characters/{char_id}")
+def delete_character(char_id: str, db: Session = Depends(get_db)):
+    db_char = db.query(CharacterAssetModel).filter(CharacterAssetModel.id == char_id).first()
+    if not db_char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    db.delete(db_char)
+    db.commit()
+    return {"message": "Character deleted successfully"}
