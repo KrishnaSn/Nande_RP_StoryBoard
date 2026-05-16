@@ -15,6 +15,7 @@ describe('StoryStore', () => {
     getState().episodeGraphs = { 'ep-1': { nodes: [], edges: [] } }
     getState().characterAssets = []
     getState().currentLayer = 'Story Graph'
+    getState().hasInitialized = true
   })
 
   it('should initialize with a default episode', () => {

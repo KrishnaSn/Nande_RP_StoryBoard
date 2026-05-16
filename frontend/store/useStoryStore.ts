@@ -45,6 +45,7 @@ interface StoryState {
   characterAssets: CharacterAsset[]
   selectedNode: StoryNode | null
   currentLayer: string
+  hasInitialized: boolean
   
   // Computed (getters)
   getNodes: () => StoryNode[]
@@ -96,6 +97,7 @@ export const useStoryStore = create<StoryState>()(
     characterAssets: [],
     selectedNode: null,
     currentLayer: 'Story Graph',
+    hasInitialized: false,
 
     loadCharacters: async () => {
       try {
@@ -167,6 +169,9 @@ export const useStoryStore = create<StoryState>()(
         if (!res.ok) throw new Error(`Backend fetch failed with status: ${res.status}`)
         const data = await res.json()
         
+        const currentState = get()
+        const now = Date.now()
+
         if (data && data.length > 0) {
           const loadedGraphs: Record<string, EpisodeData> = {}
           const loadedEpisodes = data.map((ep: { id: string; nodes: string | StoryNode[]; edges: string | StoryEdge[]; title: string; description: string }) => {
@@ -177,16 +182,26 @@ export const useStoryStore = create<StoryState>()(
             return { id: ep.id, title: ep.title, description: ep.description }
           })
 
-          const currentState = get()
+          // SYNC GUARD: If we edited something locally in the last 3 seconds, 
+          // we merge the server's other episodes but keep OUR version of the current episode graph.
+          // This prevents the "snapping back" or "popping" behavior.
+          const isRecentLocalEdit = (now - currentState.lastEditTime) < 3000
           
+          const filteredLoadedGraphs = { ...loadedGraphs }
+          if (isRecentLocalEdit && currentState.currentEpisodeId) {
+            // Keep our local version for the active episode to avoid jitter
+            filteredLoadedGraphs[currentState.currentEpisodeId] = currentState.episodeGraphs[currentState.currentEpisodeId]
+          }
+
           // SMART UPDATE: Only update if there is a real difference
           const episodesChanged = JSON.stringify(loadedEpisodes) !== JSON.stringify(currentState.episodes)
-          const graphsChanged = JSON.stringify(loadedGraphs) !== JSON.stringify(currentState.episodeGraphs)
+          const graphsChanged = JSON.stringify(filteredLoadedGraphs) !== JSON.stringify(currentState.episodeGraphs)
 
           if (episodesChanged || graphsChanged) {
             set({ 
               episodes: loadedEpisodes, 
-              episodeGraphs: loadedGraphs,
+              episodeGraphs: filteredLoadedGraphs,
+              hasInitialized: true,
               // Keep current ID unless it was deleted by someone else
               currentEpisodeId: currentState.currentEpisodeId && loadedEpisodes.some((e: Episode) => e.id === currentState.currentEpisodeId) 
                 ? currentState.currentEpisodeId 
@@ -195,18 +210,17 @@ export const useStoryStore = create<StoryState>()(
             console.log('🔄 StoryBoard: Syncing latest changes...')
           }
         } else {
-          // CRITICAL: We only create the default episode if BOTH backend is empty 
-          // AND we don't have any episodes in our current session.
-          // This prevents "The Prologue" from reappearing every 5 seconds after deletion.
-          const currentState = get()
-          if (currentState.episodes.length === 0) {
+          // CRITICAL: We only create the default episode if we haven't initialized yet
+          // and the backend is empty. This prevents "The Prologue" from reappearing after deletion.
+          if (!currentState.hasInitialized) {
             const defaultId = `ep-initial`
             const defaultEp = { id: defaultId, title: 'The Prologue', description: 'The beginning of your story.' }
             
             set({
               episodes: [defaultEp],
               episodeGraphs: { [defaultId]: { nodes: [], edges: [] } },
-              currentEpisodeId: defaultId
+              currentEpisodeId: defaultId,
+              hasInitialized: true
             })
             
             // Auto-save the new default episode to backend
@@ -222,13 +236,14 @@ export const useStoryStore = create<StoryState>()(
       } catch (error) {
         console.error('❌ StoryBoard: Failed to load from backend.', error)
         
-        // Ensure we have at least one episode for offline use if none exist
-        if (get().episodes.length === 0) {
+        // Ensure we have at least one episode for offline use if none exist and not initialized
+        if (!get().hasInitialized && get().episodes.length === 0) {
           const defaultId = 'ep-offline'
           set({
             episodes: [{ id: defaultId, title: 'Local Workspace', description: 'Backend unreachable. Nodes can still be added.' }],
             episodeGraphs: { [defaultId]: { nodes: [], edges: [] } },
-            currentEpisodeId: defaultId
+            currentEpisodeId: defaultId,
+            hasInitialized: true
           })
         }
       }
@@ -328,6 +343,7 @@ export const useStoryStore = create<StoryState>()(
       if (!currentGraph) return
 
       set({
+        lastEditTime: Date.now(),
         episodeGraphs: {
           ...episodeGraphs,
           [currentEpisodeId]: {
@@ -347,6 +363,7 @@ export const useStoryStore = create<StoryState>()(
       if (!currentGraph) return
 
       set({
+        lastEditTime: Date.now(),
         episodeGraphs: {
           ...episodeGraphs,
           [currentEpisodeId]: {
@@ -365,6 +382,7 @@ export const useStoryStore = create<StoryState>()(
       if (!currentGraph) return
 
       set({
+        lastEditTime: Date.now(),
         episodeGraphs: {
           ...episodeGraphs,
           [currentEpisodeId]: {
@@ -389,7 +407,7 @@ export const useStoryStore = create<StoryState>()(
     },
 
     addNode: (type: string, position?: { x: number, y: number }, initialData?: any) => {
-      const { currentEpisodeId, episodeGraphs, currentLayer } = get()
+      const { currentEpisodeId, episodeGraphs, currentLayer, saveCurrentEpisode } = get()
       
       if (!currentEpisodeId || !episodeGraphs[currentEpisodeId]) {
         console.error('Cannot add node: No active episode selected.')
@@ -441,10 +459,13 @@ export const useStoryStore = create<StoryState>()(
           }
         }
       })
+
+      // Sync to backend immediately
+      saveCurrentEpisode()
     },
 
     updateNodeData: (nodeId: string, data: any) => {
-      const { currentEpisodeId, episodeGraphs } = get()
+      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
       const currentGraph = episodeGraphs[currentEpisodeId]
       const updatedNode = currentGraph.nodes.find(n => n.id === nodeId)
       
@@ -475,10 +496,12 @@ export const useStoryStore = create<StoryState>()(
       if (get().selectedNode?.id === nodeId) {
         set({ selectedNode: newNodes.find(n => n.id === nodeId) || null })
       }
+
+      saveCurrentEpisode()
     },
 
     addChoiceOption: (nodeId: string) => {
-      const { currentEpisodeId, episodeGraphs } = get()
+      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
       const currentGraph = episodeGraphs[currentEpisodeId]
       
       const newNodes = currentGraph.nodes.map((node) => {
@@ -502,10 +525,12 @@ export const useStoryStore = create<StoryState>()(
       if (get().selectedNode?.id === nodeId) {
         set({ selectedNode: newNodes.find(n => n.id === nodeId) || null })
       }
+
+      saveCurrentEpisode()
     },
 
     removeChoiceOption: (nodeId: string, index: number) => {
-      const { currentEpisodeId, episodeGraphs } = get()
+      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
       const currentGraph = episodeGraphs[currentEpisodeId]
       
       const newNodes = currentGraph.nodes.map((node) => {
@@ -533,10 +558,12 @@ export const useStoryStore = create<StoryState>()(
       if (get().selectedNode?.id === nodeId) {
         set({ selectedNode: newNodes.find(n => n.id === nodeId) || null })
       }
+
+      saveCurrentEpisode()
     },
 
     deleteNode: (nodeId: string) => {
-      const { currentEpisodeId, episodeGraphs } = get()
+      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
       const currentGraph = episodeGraphs[currentEpisodeId]
 
       set({
@@ -551,6 +578,8 @@ export const useStoryStore = create<StoryState>()(
         },
         selectedNode: get().selectedNode?.id === nodeId ? null : get().selectedNode,
       })
+
+      saveCurrentEpisode()
     },
 
     addEpisode: async (id: string, title: string, description: string) => {
