@@ -26,73 +26,75 @@ export default function ArcTimeline() {
   }
 
   return (
-    <div className={`h-24 border-t border-white/5 bg-[#0d0d0d] flex items-center px-6 gap-6 z-20 relative overflow-hidden transition-all duration-500 ${isPresenting ? 'translate-y-full opacity-0 invisible' : 'translate-y-0 opacity-100 visible'}`}>
-      <div className="ui-tag">[ARC_TIMELINE]</div>
-      
-      <div className="flex items-center gap-3 pr-6 border-r border-white/5">
-        <div className="p-2 rounded-lg bg-red-500/10 text-red-500">
-          <Clapperboard size={18} />
-        </div>
-        <div>
-          <h2 className="text-[10px] font-black text-white uppercase tracking-widest leading-none mb-1">Arc Timeline</h2>
-          <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Sequence Editor</p>
-        </div>
-      </div>
-
-      <div className="flex-1 flex items-center gap-3 overflow-x-auto pb-2 custom-scrollbar">
-        {arcs.map((arc) => (
-          <div
-            key={arc.id}
-            onClick={() => setCurrentArc(arc.id)}
-            className={`group relative flex-shrink-0 min-w-[200px] h-14 rounded-xl border transition-all cursor-pointer flex items-center px-4 gap-3 ${
-              currentArcId === arc.id 
-                ? 'bg-red-500/10 border-red-500/50 shadow-lg shadow-red-500/5' 
-                : 'bg-white/5 border-white/5 hover:border-white/20'
-            }`}
-          >
-            <div className={`w-1.5 h-1.5 rounded-full ${currentArcId === arc.id ? 'bg-red-500 animate-pulse' : 'bg-zinc-700'}`} />
-            <div className="flex-1 min-w-0">
-              <h3 className={`text-[10px] font-bold truncate uppercase tracking-tight ${currentArcId === arc.id ? 'text-white' : 'text-zinc-400'}`}>
-                {arc.title}
-              </h3>
-              <p className="text-[8px] text-zinc-600 truncate font-medium uppercase">{arc.description || 'No description'}</p>
-            </div>
-
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (confirm('Delete this Arc? All nodes will be lost.')) deleteArc(arc.id)
-                }}
-                className="p-1 rounded hover:bg-white/10 text-zinc-500 hover:text-red-500"
-              >
-                <X size={12} />
-              </button>
-            </div>
+    <>
+      <div className={`h-24 border-t border-white/5 bg-[#0d0d0d] flex items-center px-6 gap-6 z-20 relative overflow-hidden transition-all duration-500 ${isPresenting ? 'translate-y-full opacity-0 invisible' : 'translate-y-0 opacity-100 visible'}`}>
+        <div className="ui-tag">[ARC_TIMELINE]</div>
+        
+        <div className="flex items-center gap-3 pr-6 border-r border-white/5">
+          <div className="p-2 rounded-lg bg-red-500/10 text-red-500">
+            <Clapperboard size={18} />
           </div>
-        ))}
+          <div>
+            <h2 className="text-[10px] font-black text-white uppercase tracking-widest leading-none mb-1">Arc Timeline</h2>
+            <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Sequence Editor</p>
+          </div>
+        </div>
 
-        <button 
-          onClick={() => setShowNewArcModal(true)}
-          className="flex-shrink-0 h-14 w-14 rounded-xl border border-dashed border-white/10 flex items-center justify-center text-zinc-500 hover:border-white/30 hover:text-white hover:bg-white/5 transition-all"
-        >
-          <Plus size={20} />
-        </button>
+        <div className="flex-1 flex items-center gap-3 overflow-x-auto pb-2 custom-scrollbar">
+          {arcs.map((arc) => (
+            <div
+              key={arc.id}
+              onClick={() => setCurrentArc(arc.id)}
+              className={`group relative flex-shrink-0 min-w-[200px] h-14 rounded-xl border transition-all cursor-pointer flex items-center px-4 gap-3 ${
+                currentArcId === arc.id 
+                  ? 'bg-red-500/10 border-red-500/50 shadow-lg shadow-red-500/5' 
+                  : 'bg-white/5 border-white/5 hover:border-white/20'
+              }`}
+            >
+              <div className={`w-1.5 h-1.5 rounded-full ${currentArcId === arc.id ? 'bg-red-500 animate-pulse' : 'bg-zinc-700'}`} />
+              <div className="flex-1 min-w-0">
+                <h3 className={`text-[10px] font-bold truncate uppercase tracking-tight ${currentArcId === arc.id ? 'text-white' : 'text-zinc-400'}`}>
+                  {arc.title}
+                </h3>
+                <p className="text-[8px] text-zinc-600 truncate font-medium uppercase">{arc.description || 'No description'}</p>
+              </div>
+
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (confirm('Delete this Arc? All nodes will be lost.')) deleteArc(arc.id)
+                  }}
+                  className="p-1 rounded hover:bg-white/10 text-zinc-500 hover:text-red-500"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <button 
+            onClick={() => setShowNewArcModal(true)}
+            className="flex-shrink-0 h-14 w-14 rounded-xl border border-dashed border-white/10 flex items-center justify-center text-zinc-500 hover:border-white/30 hover:text-white hover:bg-white/5 transition-all"
+          >
+            <Plus size={20} />
+          </button>
+        </div>
+
+        <div className="pl-6 border-l border-white/5">
+          <button 
+            onClick={() => setShowNewArcModal(true)}
+            className="bg-white text-black text-[10px] font-black uppercase px-4 py-2 rounded-lg hover:bg-zinc-200 transition-all shadow-xl active:scale-95"
+          >
+            + New Arc
+          </button>
+        </div>
       </div>
 
-      <div className="pl-6 border-l border-white/5">
-        <button 
-          onClick={() => setShowNewArcModal(true)}
-          className="bg-white text-black text-[10px] font-black uppercase px-4 py-2 rounded-lg hover:bg-zinc-200 transition-all shadow-xl active:scale-95"
-        >
-          + New Arc
-        </button>
-      </div>
-
-      {/* New Arc Modal */}
+      {/* New Arc Modal - MOVED OUTSIDE parent div to escape CSS Transform containing block */}
       {showNewArcModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#0d0d0d] border border-white/10 rounded-2xl shadow-2xl p-6 relative">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#0d0d0d] border border-white/10 rounded-2xl shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-300">
             <button 
               onClick={() => setShowNewArcModal(false)}
               className="absolute top-4 right-4 text-zinc-500 hover:text-white"
@@ -145,6 +147,6 @@ export default function ArcTimeline() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
