@@ -11,16 +11,28 @@ router = APIRouter()
 
 @router.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
-    upload_dir = "uploads"
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+    
+    # Use a safer path resolution
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    upload_dir = os.path.join(base_dir, "uploads")
+    
     if not os.path.exists(upload_dir):
         os.makedirs(upload_dir)
     
-    file_path = os.path.join(upload_dir, file.filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Clean filename to avoid issues with spaces or special characters
+    safe_filename = os.path.basename(file.filename).replace(" ", "_")
+    file_path = os.path.join(upload_dir, safe_filename)
+    
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
     
     base_url = os.getenv("BASE_URL", "http://localhost:8000").rstrip("/")
-    return {"url": f"{base_url}/uploads/{file.filename}"}
+    return {"url": f"{base_url}/uploads/{safe_filename}"}
 
 @router.get("/episodes", response_model=list[Episode])
 def get_episodes(db: Session = Depends(get_db)):

@@ -101,7 +101,10 @@ export const useStoryStore = create<StoryState>()(
         const res = await fetch(`${API_URL}/characters`)
         if (res.ok) {
           const data = await res.json()
-          set({ characterAssets: data })
+          // Only update if data actually changed
+          if (JSON.stringify(data) !== JSON.stringify(get().characterAssets)) {
+            set({ characterAssets: data })
+          }
         }
       } catch (error) {
         console.error('Failed to load characters:', error)
@@ -118,9 +121,15 @@ export const useStoryStore = create<StoryState>()(
         if (res.ok) {
           const newAsset = await res.json()
           set({ characterAssets: [...get().characterAssets, newAsset] })
+          console.log('✅ StoryBoard: Character asset saved.')
+          return true
         }
+        const err = await res.text()
+        console.error('❌ StoryBoard: Failed to save character:', err)
+        return false
       } catch (error) {
-        console.error('Failed to save character:', error)
+        console.error('❌ StoryBoard: Error saving character:', error)
+        return false
       }
     },
 
@@ -129,6 +138,7 @@ export const useStoryStore = create<StoryState>()(
         const formData = new FormData()
         formData.append('file', file)
 
+        console.log(`📤 StoryBoard: Uploading ${file.name} to ${API_URL}/upload...`)
         const res = await fetch(`${API_URL}/upload`, {
           method: 'POST',
           body: formData
@@ -136,11 +146,15 @@ export const useStoryStore = create<StoryState>()(
 
         if (res.ok) {
           const data = await res.json()
+          console.log('✅ StoryBoard: Upload successful:', data.url)
           return data.url
         }
-        throw new Error('Upload failed')
+        
+        const errorText = await res.text()
+        console.error(`❌ StoryBoard: Upload failed with status ${res.status}:`, errorText)
+        throw new Error(`Upload failed (${res.status})`)
       } catch (error) {
-        console.error('Failed to upload image:', error)
+        console.error('❌ StoryBoard: Network error during upload:', error)
         throw error
       }
     },
@@ -148,9 +162,6 @@ export const useStoryStore = create<StoryState>()(
 
     loadEpisodes: async () => {
       try {
-        // Load characters first
-        await get().loadCharacters()
-
         const res = await fetch(`${API_URL}/episodes`)
         if (!res.ok) throw new Error(`Backend fetch failed with status: ${res.status}`)
         const data = await res.json()
@@ -165,12 +176,23 @@ export const useStoryStore = create<StoryState>()(
             return { id: ep.id, title: ep.title, description: ep.description }
           })
 
-          set({ 
-            episodes: loadedEpisodes, 
-            episodeGraphs: loadedGraphs,
-            currentEpisodeId: loadedEpisodes[0].id
-          })
-          console.log('✅ StoryBoard: Episodes loaded from backend.')
+          const currentState = get()
+          
+          // SMART UPDATE: Only update if there is a real difference
+          const episodesChanged = JSON.stringify(loadedEpisodes) !== JSON.stringify(currentState.episodes)
+          const graphsChanged = JSON.stringify(loadedGraphs) !== JSON.stringify(currentState.episodeGraphs)
+
+          if (episodesChanged || graphsChanged) {
+            set({ 
+              episodes: loadedEpisodes, 
+              episodeGraphs: loadedGraphs,
+              // Keep current ID unless it was deleted by someone else
+              currentEpisodeId: loadedEpisodes.some(e => e.id === currentState.currentEpisodeId) 
+                ? currentState.currentEpisodeId 
+                : loadedEpisodes[0].id
+            })
+            console.log('🔄 StoryBoard: Syncing latest changes from other users.')
+          }
         } else {
           // If no episodes, create a default one and SAVE it immediately
           const defaultId = `ep-${nanoid(5)}`
@@ -516,7 +538,7 @@ export const useStoryStore = create<StoryState>()(
       })
     },
 
-    addEpisode: (id: string, title: string, description: string) => {
+    addEpisode: async (id: string, title: string, description: string) => {
       const newEp = { id, title, description }
       
       set({ 
@@ -527,6 +549,18 @@ export const useStoryStore = create<StoryState>()(
         },
         currentEpisodeId: id
       })
+
+      // Proactively save new episode to backend
+      try {
+        await fetch(`${API_URL}/episodes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newEp)
+        })
+        console.log(`✅ StoryBoard: Episode "${title}" created and saved.`)
+      } catch (error) {
+        console.error('❌ StoryBoard: Failed to persist new episode:', error)
+      }
     },
 
     updateEpisode: (id: string, data: Partial<Episode>) => {
