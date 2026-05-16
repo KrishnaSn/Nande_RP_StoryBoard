@@ -54,14 +54,13 @@ function FlowEditor() {
   useEffect(() => {
     // Initial load
     loadEpisodes()
+    loadCharacters()
     
-    // Set up polling interval (every 10 seconds)
+    // Set up polling interval (every 5 seconds)
     const interval = setInterval(() => {
-      // Only refresh if the user isn't actively moving a node to avoid jitter
-      // (React Flow handles its own state, but we fetch metadata/other users' nodes)
       loadEpisodes()
       loadCharacters()
-    }, 10000)
+    }, 5000)
 
     return () => clearInterval(interval)
   }, [loadEpisodes, loadCharacters])

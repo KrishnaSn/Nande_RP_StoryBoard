@@ -15,12 +15,13 @@ export default function SceneNode({ data, selected }: any) {
         <span>Scene Node</span>
       </div>
 
-      <div className="relative bg-black/40">
+      <div className="relative h-44 w-full bg-black/20 overflow-hidden">
         <img
           src={data.image}
-          className="h-40 w-full object-contain opacity-80"
+          className="h-full w-full object-cover opacity-90 transition-all duration-700 ease-in-out"
           onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=1200&auto=format&fit=crop' }}
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0d] via-transparent to-transparent opacity-60" />
       </div>
 
       <div className="p-4">

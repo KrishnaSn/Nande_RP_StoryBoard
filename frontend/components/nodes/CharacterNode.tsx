@@ -16,13 +16,13 @@ export default function CharacterNode({ data, selected }: any) {
         <span>Character Identity</span>
       </div>
 
-      <div className="relative bg-black/40">
+      <div className="relative h-44 w-full bg-black/20 overflow-hidden border-b border-white/5">
         <img
           src={data.image}
-          className="h-32 w-full object-contain transition-all duration-500"
+          className="h-full w-full object-cover grayscale-[0.3] hover:grayscale-0 transition-all duration-700 ease-in-out"
           onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=1200&auto=format&fit=crop' }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0d] via-transparent to-transparent opacity-60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d]/20 to-transparent opacity-80" />
       </div>
 
       <div className="px-4 pb-4 -mt-6 relative z-10">
