@@ -1,22 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { Save, Play, Share2, Sparkles, Settings, Loader2, Check } from 'lucide-react'
+import { Save, Play, Share2, Sparkles, Settings, Loader2, Check, Cloud } from 'lucide-react'
 import { useStoryStore } from '../../store/useStoryStore'
 
 export default function TopBar() {
-  const { saveCurrentEpisode, episodes, currentEpisodeId } = useStoryStore()
+  const { arcs, currentArcId, saveCurrentArc } = useStoryStore()
   const [isSaving, setIsSaving] = useState(false)
-  const [showSuccess, setShowCheck] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
 
-  const currentEp = episodes.find(ep => ep.id === currentEpisodeId)
+  const currentArc = arcs.find(a => a.id === currentArcId)
 
-  const handleSave = async () => {
+  const handleManualSave = async () => {
     setIsSaving(true)
-    await saveCurrentEpisode()
+    await saveCurrentArc()
     setIsSaving(false)
-    setShowCheck(true)
-    setTimeout(() => setShowCheck(false), 2000)
+    setShowSaved(true)
+    setTimeout(() => setShowSaved(false), 2000)
   }
 
   return (
@@ -33,47 +33,46 @@ export default function TopBar() {
             </h1>
             <div className="flex items-center gap-1.5">
               <span className="w-1 h-1 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Cinematic Mode Active</span>
+              <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Arc Mode Active</span>
             </div>
           </div>
         </div>
         
         <div className="h-4 w-px bg-white/10" />
         
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded">
-            Project:
-          </span>
-          <span className="text-xs font-medium text-zinc-300">
-            {currentEp?.title || 'Loading...'}
-          </span>
+        <div className="flex items-center gap-2">
+           <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Active Arc:</span>
+           <span className="text-[10px] font-black text-white uppercase tracking-tighter bg-white/5 px-2 py-1 rounded border border-white/5">
+             {currentArc?.title || 'No Arc Selected'}
+           </span>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/5 mr-4">
+           <Cloud size={14} className="text-zinc-500" />
+           <span className="text-[9px] font-bold text-zinc-500 uppercase">Manual Sync Mode</span>
+        </div>
+
         <button 
-          onClick={handleSave}
+          onClick={handleManualSave}
           disabled={isSaving}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all text-sm font-medium disabled:opacity-50"
+          className={`flex items-center gap-2 px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-xl active:scale-95 ${
+            showSaved 
+              ? 'bg-emerald-500 text-white shadow-emerald-500/20' 
+              : 'bg-white text-black hover:bg-zinc-200'
+          }`}
         >
-          {isSaving ? <Loader2 size={16} className="animate-spin" /> : showSuccess ? <Check size={16} className="text-emerald-500" /> : <Save size={16} />}
-          <span>{isSaving ? 'Saving...' : showSuccess ? 'Saved' : 'Save'}</span>
-        </button>
-        
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all text-sm font-medium">
-          <Sparkles size={16} />
-          <span>AI Assist</span>
+          {isSaving ? <Loader2 size={16} className="animate-spin" /> : (showSaved ? <Check size={16} /> : <Save size={16} />)}
+          <span>{showSaved ? 'Arc Saved' : (isSaving ? 'Syncing...' : 'Save Arc')}</span>
         </button>
 
-        <div className="h-4 w-px bg-white/10 mx-2" />
-
-        <button className="p-2 rounded-lg bg-white/5 border border-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all">
-          <Play size={18} fill="currentColor" />
+        <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/10 border border-red-600/20 text-red-500 hover:bg-red-600 hover:text-white transition-all text-[10px] font-black uppercase shadow-lg shadow-red-600/5 group">
+          <Play size={14} fill="currentColor" className="group-hover:translate-x-0.5 transition-transform" />
+          <span>Present Arc</span>
         </button>
         
-        <button className="p-2 rounded-lg bg-white/5 border border-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all">
-          <Share2 size={18} />
-        </button>
+        <div className="h-6 w-px bg-white/5 mx-2" />
         
         <button className="p-2 rounded-lg bg-white/5 border border-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all">
           <Settings size={18} />
