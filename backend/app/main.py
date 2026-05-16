@@ -2,21 +2,27 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+from contextlib import asynccontextmanager
 from app.database import engine, Base
 from app.routes.story import router as story_router
 from app.models.story import EpisodeModel, CharacterAssetModel
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create database tables on startup
+    Base.metadata.create_all(bind=engine)
+    yield
+    # Clean up on shutdown if needed
 
-app = FastAPI(title="Nande RP StoryBoard API")
+app = FastAPI(title="Nande RP StoryBoard API", lifespan=lifespan)
 
-# Ensure uploads directory exists
-UPLOAD_DIR = "uploads"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
+# Ensure uploads directory exists relative to app root
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+upload_dir = os.path.join(base_dir, "uploads")
+if not os.path.exists(upload_dir):
+    os.makedirs(upload_dir)
 
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+app.mount("/uploads", StaticFiles(directory=upload_dir), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,

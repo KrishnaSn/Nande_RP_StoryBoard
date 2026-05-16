@@ -15,10 +15,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Nande RP StoryBoard",
   description: "A professional cinematic story engine created for the private Nande RP community to plan, document, and sequence their roleplay stories.",
+  icons: {
+    icon: "/logo.jpg",
+    apple: "/logo.jpg",
+  },
   openGraph: {
     title: "Nande RP StoryBoard",
     description: "Documenting the legends of Nande RP. A private cinematic workflow for storytellers.",
-    images: ["/image.png"], // Reference the existing image if possible
+    images: ["/logo.jpg"],
   }
 };
 
