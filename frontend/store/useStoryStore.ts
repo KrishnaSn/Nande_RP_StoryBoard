@@ -64,14 +64,14 @@ interface StoryState {
   removeChoiceOption: (nodeId: string, index: number) => void
   
   // Episode Actions
-  addEpisode: (id: string, title: string, description: string) => void
+  addEpisode: (id: string, title: string, description: string) => Promise<void>
   updateEpisode: (id: string, data: Partial<Episode>) => void
   deleteEpisode: (id: string) => void
   setCurrentEpisode: (id: string) => void
 
   // Character Asset Actions
   addCharacterAsset: (asset: CharacterAsset) => void
-  saveCharacterAsset: (asset: CharacterAsset) => Promise<void>
+  saveCharacterAsset: (asset: CharacterAsset) => Promise<boolean>
   uploadImage: (file: File) => Promise<string>
   loadCharacters: () => Promise<void>
 
