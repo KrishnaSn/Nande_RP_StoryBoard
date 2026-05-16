@@ -51,6 +51,13 @@ def update_arc(arc_id: str, arc_update: ArcUpdate, user_id: Optional[str] = None
     if db_arc.locked_by and user_id != db_arc.locked_by:
         raise HTTPException(status_code=423, detail=f"Arc is locked by another user: {db_arc.locked_by}")
 
+    # Update metadata
+    if arc_update.title is not None:
+        db_arc.title = arc_update.title
+    if arc_update.description is not None:
+        db_arc.description = arc_update.description
+
+    # Update graph data
     if arc_update.nodes is not None:
         db_arc.nodes = json.dumps(arc_update.nodes)
     if arc_update.edges is not None:
