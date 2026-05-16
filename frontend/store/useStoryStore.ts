@@ -41,6 +41,7 @@ interface StoryState {
   isPresenting: boolean
   userId: string
   lockedBy: string | null
+  lastLocalEdit: number // REQUIRED FOR SYNC GUARD
   
   // Computed (getters)
   getNodes: () => StoryNode[]
@@ -98,6 +99,7 @@ export const useStoryStore = create<StoryState>()(
     isPresenting: false,
     userId: getUserId(),
     lockedBy: null,
+    lastLocalEdit: 0,
 
     loadArcs: async () => {
       try {
@@ -121,17 +123,33 @@ export const useStoryStore = create<StoryState>()(
             }
           })
 
-          const currentId = get().currentArcId || loadedArcs[0].id
+          const state = get()
+          const currentId = state.currentArcId || loadedArcs[0].id
           const activeArc = loadedArcs.find((a: Arc) => a.id === currentId)
+          
+          // SYNC LOGIC: 
+          // We always update the list of Arcs.
+          // We update the graph data ONLY IF:
+          // 1. It's not the current Arc
+          // 2. It IS the current Arc BUT we haven't edited it locally in the last 10 seconds
+          const now = Date.now()
+          const isIdle = (now - state.lastLocalEdit) > 10000
+          
+          const mergedGraphs = { ...state.arcGraphs }
+          loadedArcs.forEach((arc: Arc) => {
+            if (arc.id !== currentId || isIdle || !state.arcGraphs[arc.id]) {
+              mergedGraphs[arc.id] = loadedGraphs[arc.id]
+            }
+          })
 
           set({ 
             arcs: loadedArcs, 
-            arcGraphs: loadedGraphs,
+            arcGraphs: mergedGraphs,
             hasInitialized: true,
             currentArcId: currentId,
             lockedBy: activeArc?.locked_by || null
           })
-          console.log('📦 StoryBoard: Arcs synchronized from cloud.')
+          console.log('📦 StoryBoard: Arcs synced.')
         } else if (!get().hasInitialized) {
           const defaultId = `ep-initial`
           const defaultArc = { id: defaultId, title: 'The Prologue', description: 'The beginning of your story.' }
@@ -148,7 +166,7 @@ export const useStoryStore = create<StoryState>()(
           })
         }
       } catch (error) {
-        console.error('❌ StoryBoard: Cloud sync failed. Working in local mode.', error)
+        console.error('❌ StoryBoard: Cloud sync failed.', error)
       }
     },
 
@@ -219,15 +237,12 @@ export const useStoryStore = create<StoryState>()(
           body: JSON.stringify(payload)
         })
 
-        // CRITICAL FALLBACK: If Arc doesn't exist on server, create it first
         if (updateRes.status === 404) {
-          console.warn('⚠️ Arc not found on server, attempting to re-create...')
           await fetch(`${API_URL}/arcs`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: currentArc.id, title: currentArc.title, description: currentArc.description })
           })
-          // Retry the update
           updateRes = await fetch(`${API_URL}/arcs/${currentArc.id}?user_id=${state.userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -241,16 +256,11 @@ export const useStoryStore = create<StoryState>()(
           get().loadArcs()
           window.dispatchEvent(new CustomEvent('arc-sync-complete'))
         } else if (updateRes.status === 423) {
-           alert("Sync Locked: Another contributor is currently editing this Arc.")
+           alert("Sync Locked: Another contributor is editing this Arc.")
            get().loadArcs()
-        } else {
-           const errText = await updateRes.text()
-           alert(`Sync Failed: Server returned error ${updateRes.status}. Check console for details.`)
-           console.error('Server error:', errText)
         }
       } catch (error) {
         console.error('❌ StoryBoard: Publish failed.', error)
-        alert('Network Error: Could not connect to the cloud. Please check your internet.')
       }
     },
 
@@ -259,7 +269,8 @@ export const useStoryStore = create<StoryState>()(
       set({ 
         arcs: [...get().arcs, newArc],
         arcGraphs: { ...get().arcGraphs, [id]: { nodes: [], edges: [] } },
-        currentArcId: id
+        currentArcId: id,
+        lastLocalEdit: Date.now()
       })
       fetch(`${API_URL}/arcs`, {
         method: 'POST',
@@ -269,34 +280,36 @@ export const useStoryStore = create<StoryState>()(
     },
 
     updateArc: (id: string, data: Partial<Arc>) => {
-      set({ arcs: get().arcs.map(arc => arc.id === id ? { ...arc, ...data } : arc) })
+      set({ 
+        arcs: get().arcs.map(arc => arc.id === id ? { ...arc, ...data } : arc),
+        lastLocalEdit: Date.now()
+      })
     },
 
     deleteArc: async (id: string) => {
       const { arcs, currentArcId, arcGraphs } = get()
       const newArcs = arcs.filter(arc => arc.id !== id)
-      
       const newGraphs = { ...arcGraphs }
       delete newGraphs[id]
 
       set({ 
         arcs: newArcs, 
         arcGraphs: newGraphs, 
-        currentArcId: currentArcId === id ? (newArcs[0]?.id || '') : currentArcId 
+        currentArcId: currentArcId === id ? (newArcs[0]?.id || '') : currentArcId,
+        lastLocalEdit: 0
       })
       fetch(`${API_URL}/arcs/${id}`, { method: 'DELETE' }).catch(console.error)
     },
 
     setCurrentArc: (id: string) => {
       const arc = get().arcs.find(a => a.id === id)
-      set({ currentArcId: id, selectedNode: null, lockedBy: arc?.locked_by || null })
+      set({ currentArcId: id, selectedNode: null, lockedBy: arc?.locked_by || null, lastLocalEdit: 0 })
     },
 
     togglePresentMode: () => {
       set({ isPresenting: !get().isPresenting })
     },
 
-    // GRAPH ENGINE (100% LOCAL FOR SPEED)
     getNodes: () => {
       const state = get()
       return state.arcGraphs[state.currentArcId]?.nodes || []
@@ -313,6 +326,7 @@ export const useStoryStore = create<StoryState>()(
       if (!currentGraph) return
 
       set({
+        lastLocalEdit: Date.now(),
         arcGraphs: {
           ...arcGraphs,
           [currentArcId]: {
@@ -329,6 +343,7 @@ export const useStoryStore = create<StoryState>()(
       if (!currentGraph) return
 
       set({
+        lastLocalEdit: Date.now(),
         arcGraphs: {
           ...arcGraphs,
           [currentArcId]: {
@@ -348,6 +363,7 @@ export const useStoryStore = create<StoryState>()(
       const edgeColor = sourceNode?.data?.color || '#ef4444'
 
       set({
+        lastLocalEdit: Date.now(),
         arcGraphs: {
           ...arcGraphs,
           [currentArcId]: {
@@ -387,6 +403,7 @@ export const useStoryStore = create<StoryState>()(
       }
 
       set({
+        lastLocalEdit: Date.now(),
         arcGraphs: {
           ...arcGraphs,
           [currentArcId]: {
@@ -403,6 +420,7 @@ export const useStoryStore = create<StoryState>()(
       if (!currentGraph) return
 
       set({
+        lastLocalEdit: Date.now(),
         arcGraphs: {
           ...arcGraphs,
           [currentArcId]: {
@@ -421,6 +439,7 @@ export const useStoryStore = create<StoryState>()(
       if (!currentGraph) return
 
       set({
+        lastLocalEdit: Date.now(),
         arcGraphs: {
           ...arcGraphs,
           [currentArcId]: {
@@ -440,6 +459,7 @@ export const useStoryStore = create<StoryState>()(
       if (!currentGraph) return
       
       set({
+        lastLocalEdit: Date.now(),
         arcGraphs: {
           ...arcGraphs,
           [currentArcId]: {
@@ -470,6 +490,7 @@ export const useStoryStore = create<StoryState>()(
       })
       
       set({
+        lastLocalEdit: Date.now(),
         arcGraphs: {
           ...arcGraphs,
           [currentArcId]: {
