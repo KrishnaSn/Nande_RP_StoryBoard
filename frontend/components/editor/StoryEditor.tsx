@@ -10,6 +10,7 @@ import ReactFlow, {
   Panel
 } from 'reactflow'
 import 'reactflow/dist/style.css'
+import { Maximize2 } from 'lucide-react'
 
 import { useStoryStore } from '../../store/useStoryStore'
 import CharacterSceneNode from '../nodes/CharacterSceneNode'
@@ -43,6 +44,7 @@ function FlowEditor() {
     loadArcs,
     deleteNode,
     isPresenting,
+    togglePresentMode,
     currentArcId,
     acquireLock,
     lockedBy,
@@ -83,11 +85,16 @@ function FlowEditor() {
         const { undo } = (useStoryStore as any).temporal.getState()
         undo()
       }
+
+      // ESC to exit Present Mode
+      if (e.key === 'Escape' && isPresenting) {
+        togglePresentMode()
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [nodes, deleteNode, lockedBy, userId, handleInteraction])
+  }, [nodes, deleteNode, lockedBy, userId, handleInteraction, isPresenting, togglePresentMode])
 
   // Initial load & Polling for Locks/Sync
   useEffect(() => {
@@ -227,6 +234,18 @@ function FlowEditor() {
                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Build 2.2.0 Locked-Sync</span>
                </div>
             </Panel>
+
+            {isPresenting && (
+              <Panel position="top-right" className="m-6">
+                <button 
+                  onClick={togglePresentMode}
+                  className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-black text-[10px] font-black uppercase shadow-2xl hover:bg-zinc-200 transition-all animate-in fade-in slide-in-from-top-4 duration-500"
+                >
+                  <Maximize2 size={16} />
+                  <span>Exit Present Arc</span>
+                </button>
+              </Panel>
+            )}
 
             {menu && <ContextMenu onClick={onPaneClick} {...menu} />}
           </ReactFlow>
