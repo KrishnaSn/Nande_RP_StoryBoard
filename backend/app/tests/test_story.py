@@ -33,53 +33,36 @@ def test_read_root():
     assert response.json()["status"] == "online"
     assert "Nande RP StoryBoard" in response.json()["message"]
 
-def test_upload_image():
-    # Create a dummy file for testing
-    import io
-    file_content = b"fake image content"
-    file = io.BytesIO(file_content)
-    
+def test_create_arc():
     response = client.post(
-        "/api/upload",
-        files={"file": ("test image.jpg", file, "image/jpeg")}
-    )
-    
-    assert response.status_code == 200
-    data = response.json()
-    assert "url" in data
-    # Ensure filename was cleaned (space replaced by underscore)
-    assert "test_image.jpg" in data["url"]
-
-def test_create_episode():
-    response = client.post(
-        "/api/episodes",
-        json={"id": "test-ep-1", "title": "Test Episode", "description": "Test Description"}
+        "/api/arcs",
+        json={"id": "test-arc-1", "title": "Test Arc", "description": "Test Description"}
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["id"] == "test-ep-1"
-    assert data["title"] == "Test Episode"
+    assert data["id"] == "test-arc-1"
+    assert data["title"] == "Test Arc"
     assert data["nodes"] == []
     assert data["edges"] == []
 
-def test_get_episodes():
+def test_get_arcs():
     client.post(
-        "/api/episodes",
-        json={"id": "test-ep-1", "title": "Test Episode", "description": "Test Description"}
+        "/api/arcs",
+        json={"id": "test-arc-1", "title": "Test Arc", "description": "Test Description"}
     )
-    response = client.get("/api/episodes")
+    response = client.get("/api/arcs")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["id"] == "test-ep-1"
+    assert data[0]["id"] == "test-arc-1"
 
-def test_update_episode():
+def test_update_arc():
     client.post(
-        "/api/episodes",
-        json={"id": "test-ep-1", "title": "Test Episode", "description": "Test Description"}
+        "/api/arcs",
+        json={"id": "test-arc-1", "title": "Test Arc", "description": "Test Description"}
     )
     response = client.put(
-        "/api/episodes/test-ep-1",
+        "/api/arcs/test-arc-1",
         json={"nodes": [{"id": "node-1", "type": "scene"}], "edges": []}
     )
     assert response.status_code == 200
@@ -87,45 +70,17 @@ def test_update_episode():
     assert len(data["nodes"]) == 1
     assert data["nodes"][0]["id"] == "node-1"
 
-def test_delete_episode():
-    # Create episode
+def test_delete_arc():
+    # Create arc
     client.post(
-        "/api/episodes",
+        "/api/arcs",
         json={"id": "delete-me", "title": "To Delete", "description": "Desc"}
     )
     # Delete it
-    response = client.delete("/api/episodes/delete-me")
+    response = client.delete("/api/arcs/delete-me")
     assert response.status_code == 200
-    assert response.json()["message"] == "Episode deleted successfully"
+    assert response.json()["message"] == "Arc deleted successfully"
     # Verify it's gone
-    get_res = client.get("/api/episodes")
-    episodes = get_res.json()
-    assert not any(ep["id"] == "delete-me" for ep in episodes)
-
-def test_create_character():
-    response = client.post(
-        "/api/characters",
-        json={
-            "id": "char-1", 
-            "name": "Test Char", 
-            "image": "test.jpg",
-            "role": "Protagonist",
-            "personality": "Brave and loyal"
-        }
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["name"] == "Test Char"
-    assert data["role"] == "Protagonist"
-    assert data["personality"] == "Brave and loyal"
-
-def test_get_characters():
-    client.post(
-        "/api/characters",
-        json={"id": "char-1", "name": "Test Char", "image": "test.jpg"}
-    )
-    response = client.get("/api/characters")
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 1
-    assert data[0]["name"] == "Test Char"
+    get_res = client.get("/api/arcs")
+    arcs = get_res.json()
+    assert not any(ep["id"] == "delete-me" for ep in arcs)

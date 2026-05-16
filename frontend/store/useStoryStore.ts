@@ -18,41 +18,30 @@ import { nanoid } from 'nanoid'
 export type StoryNode = Node
 export type StoryEdge = Edge
 
-interface Episode {
+export interface Arc {
   id: string
   title: string
   description: string
 }
 
-interface CharacterAsset {
-  id: string
-  name: string
-  image: string
-  role?: string
-  personality?: string
-}
-
-interface EpisodeData {
+interface ArcData {
   nodes: StoryNode[]
   edges: StoryEdge[]
 }
 
 interface StoryState {
   // Metadata
-  episodes: Episode[]
-  currentEpisodeId: string
-  episodeGraphs: Record<string, EpisodeData>
-  characterAssets: CharacterAsset[]
+  arcs: Arc[]
+  currentArcId: string
+  arcGraphs: Record<string, ArcData>
   selectedNode: StoryNode | null
-  currentLayer: string
   hasInitialized: boolean
-  lastEditTime: number
   
   // Computed (getters)
   getNodes: () => StoryNode[]
   getEdges: () => StoryEdge[]
 
-  // Actions
+  // Actions (LOCAL ONLY)
   onNodesChange: OnNodesChange
   onEdgesChange: OnEdgesChange
   onConnect: OnConnect
@@ -65,118 +54,36 @@ interface StoryState {
   addChoiceOption: (nodeId: string) => void
   removeChoiceOption: (nodeId: string, index: number) => void
   
-  // Episode Actions
-  addEpisode: (id: string, title: string, description: string) => Promise<void>
-  updateEpisode: (id: string, data: Partial<Episode>) => void
-  deleteEpisode: (id: string) => void
-  setCurrentEpisode: (id: string) => void
+  // Arc Actions (LOCAL + SYNC)
+  addArc: (id: string, title: string, description: string) => Promise<void>
+  updateArc: (id: string, data: Partial<Arc>) => void
+  deleteArc: (id: string) => Promise<void>
+  setCurrentArc: (id: string) => void
 
-  // Character Asset Actions
-  addCharacterAsset: (asset: CharacterAsset) => void
-  saveCharacterAsset: (asset: CharacterAsset) => Promise<boolean>
-  deleteCharacterAsset: (id: string) => Promise<void>
-  uploadImage: (file: File) => Promise<string>
-  loadCharacters: () => Promise<void>
-
-  // Layer Actions
-  setLayer: (layer: string) => void
-
-  // Backend Integration
-  loadEpisodes: () => Promise<void>
-  saveCurrentEpisode: () => Promise<void>
+  // Backend Synchronization (MANUAL ONLY)
+  loadArcs: () => Promise<void>
+  saveCurrentArc: () => Promise<void>
 }
 
-const initialEpisodeId = 'ep-1'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8000'
 
 export const useStoryStore = create<StoryState>()(
   temporal((set, get) => ({
-    episodes: [],
-    currentEpisodeId: '',
-    episodeGraphs: {},
-    characterAssets: [],
+    arcs: [],
+    currentArcId: '',
+    arcGraphs: {},
     selectedNode: null,
-    currentLayer: 'Story Graph',
     hasInitialized: false,
-    lastEditTime: 0,
 
-    loadCharacters: async () => {
+    loadArcs: async () => {
       try {
-        const res = await fetch(`${API_URL}/characters`)
-        if (res.ok) {
-          const data = await res.json()
-          // Only update if data actually changed
-          if (JSON.stringify(data) !== JSON.stringify(get().characterAssets)) {
-            set({ characterAssets: data })
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load characters:', error)
-      }
-    },
-
-    saveCharacterAsset: async (asset: CharacterAsset) => {
-      try {
-        const res = await fetch(`${API_URL}/characters`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(asset)
-        })
-        if (res.ok) {
-          const newAsset = await res.json()
-          set({ characterAssets: [...get().characterAssets, newAsset] })
-          console.log('✅ StoryBoard: Character asset saved.')
-          return true
-        }
-        const err = await res.text()
-        console.error('❌ StoryBoard: Failed to save character:', err)
-        return false
-      } catch (error) {
-        console.error('❌ StoryBoard: Error saving character:', error)
-        return false
-      }
-    },
-
-    uploadImage: async (file: File) => {
-      try {
-        const formData = new FormData()
-        formData.append('file', file)
-
-        console.log(`📤 StoryBoard: Uploading ${file.name} to ${API_URL}/upload...`)
-        const res = await fetch(`${API_URL}/upload`, {
-          method: 'POST',
-          body: formData
-        })
-
-        if (res.ok) {
-          const data = await res.json()
-          console.log('✅ StoryBoard: Upload successful:', data.url)
-          return data.url
-        }
-        
-        const errorText = await res.text()
-        console.error(`❌ StoryBoard: Upload failed with status ${res.status}:`, errorText)
-        throw new Error(`Upload failed (${res.status})`)
-      } catch (error) {
-        console.error('❌ StoryBoard: Network error during upload:', error)
-        throw error
-      }
-    },
-
-
-    loadEpisodes: async () => {
-      try {
-        const res = await fetch(`${API_URL}/episodes`)
+        const res = await fetch(`${API_URL}/arcs`)
         if (!res.ok) throw new Error(`Backend fetch failed with status: ${res.status}`)
         const data = await res.json()
         
-        const currentState = get()
-        const now = Date.now()
-
         if (data && data.length > 0) {
-          const loadedGraphs: Record<string, EpisodeData> = {}
-          const loadedEpisodes = data.map((ep: { id: string; nodes: string | StoryNode[]; edges: string | StoryEdge[]; title: string; description: string }) => {
+          const loadedGraphs: Record<string, ArcData> = {}
+          const loadedArcs = data.map((ep: any) => {
             loadedGraphs[ep.id] = { 
               nodes: typeof ep.nodes === 'string' ? JSON.parse(ep.nodes) : (ep.nodes || []), 
               edges: typeof ep.edges === 'string' ? JSON.parse(ep.edges) : (ep.edges || []) 
@@ -184,224 +91,173 @@ export const useStoryStore = create<StoryState>()(
             return { id: ep.id, title: ep.title, description: ep.description }
           })
 
-          // SYNC GUARD: If we edited something locally in the last 3 seconds, 
-          // we merge the server's other episodes but keep OUR version of the current episode graph.
-          // This prevents the "snapping back" or "popping" behavior.
-          const isRecentLocalEdit = (now - currentState.lastEditTime) < 3000
-          
-          const filteredLoadedGraphs = { ...loadedGraphs }
-          if (isRecentLocalEdit && currentState.currentEpisodeId) {
-            // Keep our local version for the active episode to avoid jitter
-            filteredLoadedGraphs[currentState.currentEpisodeId] = currentState.episodeGraphs[currentState.currentEpisodeId]
-          }
-
-          // SMART UPDATE: Only update if there is a real difference
-          const episodesChanged = JSON.stringify(loadedEpisodes) !== JSON.stringify(currentState.episodes)
-          const graphsChanged = JSON.stringify(filteredLoadedGraphs) !== JSON.stringify(currentState.episodeGraphs)
-
-          if (episodesChanged || graphsChanged) {
-            set({ 
-              episodes: loadedEpisodes, 
-              episodeGraphs: filteredLoadedGraphs,
-              hasInitialized: true,
-              // Keep current ID unless it was deleted by someone else
-              currentEpisodeId: currentState.currentEpisodeId && loadedEpisodes.some((e: Episode) => e.id === currentState.currentEpisodeId) 
-                ? currentState.currentEpisodeId 
-                : loadedEpisodes[0].id
-            })
-            console.log('🔄 StoryBoard: Syncing latest changes...')
-          }
-        } else {
-          // CRITICAL: We only create the default episode if we haven't initialized yet
-          // and the backend is empty. This prevents "The Prologue" from reappearing after deletion.
-          if (!currentState.hasInitialized) {
-            const defaultId = `ep-initial`
-            const defaultEp = { id: defaultId, title: 'The Prologue', description: 'The beginning of your story.' }
-            
-            set({
-              episodes: [defaultEp],
-              episodeGraphs: { [defaultId]: { nodes: [], edges: [] } },
-              currentEpisodeId: defaultId,
-              hasInitialized: true
-            })
-            
-            // Auto-save the new default episode to backend
-            fetch(`${API_URL}/episodes`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(defaultEp)
-            }).catch(err => console.error('Failed to auto-save default episode:', err))
-
-            console.log('ℹ️ StoryBoard: Initialized default workspace.')
-          }
-        }
-      } catch (error) {
-        console.error('❌ StoryBoard: Failed to load from backend.', error)
-        
-        // Ensure we have at least one episode for offline use if none exist and not initialized
-        if (!get().hasInitialized && get().episodes.length === 0) {
-          const defaultId = 'ep-offline'
+          set({ 
+            arcs: loadedArcs, 
+            arcGraphs: loadedGraphs,
+            hasInitialized: true,
+            currentArcId: get().currentArcId || loadedArcs[0].id
+          })
+          console.log('📦 StoryBoard: Arcs synchronized from cloud.')
+        } else if (!get().hasInitialized) {
+          const defaultId = `ep-initial`
+          const defaultArc = { id: defaultId, title: 'The Prologue', description: 'The beginning of your story.' }
           set({
-            episodes: [{ id: defaultId, title: 'Local Workspace', description: 'Backend unreachable. Nodes can still be added.' }],
-            episodeGraphs: { [defaultId]: { nodes: [], edges: [] } },
-            currentEpisodeId: defaultId,
+            arcs: [defaultArc],
+            arcGraphs: { [defaultId]: { nodes: [], edges: [] } },
+            currentArcId: defaultId,
             hasInitialized: true
           })
-        }
-      }
-    },
-
-    saveCurrentEpisode: async () => {
-      const state = get()
-      const currentEp = state.episodes.find(ep => ep.id === state.currentEpisodeId)
-      const graph = state.episodeGraphs[state.currentEpisodeId]
-      
-      if (!currentEp || !graph) return
-
-      try {
-        const updateRes = await fetch(`${API_URL}/episodes/${currentEp.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodes: graph.nodes, edges: graph.edges })
-        })
-
-        if (!updateRes.ok && updateRes.status === 404) {
-          await fetch(`${API_URL}/episodes`, {
+          // Initial auto-save for new users only
+          fetch(`${API_URL}/arcs`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: currentEp.id, title: currentEp.title, description: currentEp.description })
-          })
-          await fetch(`${API_URL}/episodes/${currentEp.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nodes: graph.nodes, edges: graph.edges })
+            body: JSON.stringify(defaultArc)
           })
         }
       } catch (error) {
-        console.error('Failed to save episode:', error)
+        console.error('❌ StoryBoard: Cloud sync failed. Working in local mode.', error)
       }
     },
 
-    deleteEpisode: async (id: string) => {
-      const { episodes, currentEpisodeId, episodeGraphs } = get()
+    saveCurrentArc: async () => {
+      const state = get()
+      const currentArc = state.arcs.find(arc => arc.id === state.currentArcId)
+      const graph = state.arcGraphs[state.currentArcId]
       
-      // OPTIMISTIC UPDATE: Remove immediately from UI
-      const newEpisodes = episodes.filter(ep => ep.id !== id)
-      const newGraphs = { ...episodeGraphs }
+      if (!currentArc || !graph) return
+
+      try {
+        console.log(`📡 StoryBoard: Publishing Arc "${currentArc.title}"...`)
+        
+        // LLM OPTIMIZATION: Ensure nodes have explicit metadata tags before saving
+        const optimizedNodes = graph.nodes.map(n => ({
+          ...n,
+          meta: { 
+            character: n.data.character,
+            type: n.type,
+            length: n.data.description?.length || 0,
+            has_branches: n.data.options?.length > 0
+          }
+        }))
+
+        const updateRes = await fetch(`${API_URL}/arcs/${currentArc.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodes: optimizedNodes, edges: graph.edges })
+        })
+
+        if (updateRes.ok) {
+          console.log('✅ StoryBoard: Publish complete.')
+          // Trigger the success modal
+          window.dispatchEvent(new CustomEvent('arc-sync-complete'))
+        }
+      } catch (error) {
+        console.error('❌ StoryBoard: Publish failed.', error)
+      }
+    },
+
+    // ARC MANAGEMENT (LOCAL FIRST)
+    addArc: async (id: string, title: string, description: string) => {
+      const newArc = { id, title, description }
+      set({ 
+        arcs: [...get().arcs, newArc],
+        arcGraphs: { ...get().arcGraphs, [id]: { nodes: [], edges: [] } },
+        currentArcId: id
+      })
+      // Publish creation immediately
+      fetch(`${API_URL}/arcs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newArc)
+      }).catch(console.error)
+    },
+
+    updateArc: (id: string, data: Partial<Arc>) => {
+      set({ arcs: get().arcs.map(arc => arc.id === id ? { ...arc, ...data } : arc) })
+    },
+
+    deleteArc: async (id: string) => {
+      const { arcs, currentArcId, arcGraphs } = get()
+      const newArcs = arcs.filter(arc => arc.id !== id)
+      
+      const newGraphs = { ...arcGraphs }
       delete newGraphs[id]
 
-      let newCurrentId = currentEpisodeId
-      if (currentEpisodeId === id) {
-        newCurrentId = newEpisodes.length > 0 ? newEpisodes[0].id : ''
-      }
-
       set({ 
-        episodes: newEpisodes, 
-        episodeGraphs: newGraphs, 
-        currentEpisodeId: newCurrentId 
+        arcs: newArcs, 
+        arcGraphs: newGraphs, 
+        currentArcId: currentArcId === id ? (newArcs[0]?.id || '') : currentArcId 
       })
-      
-      console.log(`🗑️ StoryBoard: Optimistically deleted episode ${id}.`)
-
-      // Sync with backend
-      try {
-        const res = await fetch(`${API_URL}/episodes/${id}`, { method: 'DELETE' })
-        if (!res.ok) throw new Error('Failed to delete on backend')
-        console.log('✅ StoryBoard: Episode deletion synced with backend.')
-      } catch (error) {
-        console.error('❌ StoryBoard: Failed to delete episode on backend:', error)
-      }
+      fetch(`${API_URL}/arcs/${id}`, { method: 'DELETE' }).catch(console.error)
     },
 
+    setCurrentArc: (id: string) => {
+      set({ currentArcId: id, selectedNode: null })
+    },
+
+    // GRAPH ENGINE (100% LOCAL FOR SPEED)
     getNodes: () => {
       const state = get()
-      const nodes = state.episodeGraphs[state.currentEpisodeId]?.nodes || []
-      
-      if (state.currentLayer === 'Logic Layer') {
-        return nodes.filter(n => n.type === 'choice' || n.type === 'dialogue')
-      }
-      if (state.currentLayer === 'Cinematic Path') {
-        return nodes.filter(n => n.type === 'scene' || n.type === 'dialogue')
-      }
-      if (state.currentLayer === 'Director Notes') {
-        return nodes.filter(n => n.type === 'character' || n.type === 'scene')
-      }
-      
-      return nodes
+      return state.arcGraphs[state.currentArcId]?.nodes || []
     },
 
     getEdges: () => {
       const state = get()
-      const allEdges = state.episodeGraphs[state.currentEpisodeId]?.edges || []
-      const visibleNodes = state.getNodes()
-      const visibleNodeIds = new Set(visibleNodes.map(n => n.id))
-      
-      return allEdges.filter(e => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target))
+      return state.arcGraphs[state.currentArcId]?.edges || []
     },
 
     onNodesChange: (changes: NodeChange[]) => {
-      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
-      const currentGraph = episodeGraphs[currentEpisodeId]
+      const { currentArcId, arcGraphs } = get()
+      const currentGraph = arcGraphs[currentArcId]
       if (!currentGraph) return
 
       set({
-        lastEditTime: Date.now(),
-        episodeGraphs: {
-          ...episodeGraphs,
-          [currentEpisodeId]: {
+        arcGraphs: {
+          ...arcGraphs,
+          [currentArcId]: {
             ...currentGraph,
             nodes: applyNodeChanges(changes, currentGraph.nodes),
           }
         }
       })
-      
-      // Auto-save on movement/changes
-      saveCurrentEpisode()
     },
 
     onEdgesChange: (changes: EdgeChange[]) => {
-      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
-      const currentGraph = episodeGraphs[currentEpisodeId]
+      const { currentArcId, arcGraphs } = get()
+      const currentGraph = arcGraphs[currentArcId]
       if (!currentGraph) return
 
       set({
-        lastEditTime: Date.now(),
-        episodeGraphs: {
-          ...episodeGraphs,
-          [currentEpisodeId]: {
+        arcGraphs: {
+          ...arcGraphs,
+          [currentArcId]: {
             ...currentGraph,
             edges: applyEdgeChanges(changes, currentGraph.edges),
           }
         }
       })
-
-      saveCurrentEpisode()
     },
 
     onConnect: (connection: Connection) => {
-      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
-      const currentGraph = episodeGraphs[currentEpisodeId]
+      const { currentArcId, arcGraphs } = get()
+      const currentGraph = arcGraphs[currentArcId]
       if (!currentGraph) return
 
+      const sourceNode = currentGraph.nodes.find(n => n.id === connection.source)
+      const edgeColor = sourceNode?.data?.color || '#ef4444'
+
       set({
-        lastEditTime: Date.now(),
-        episodeGraphs: {
-          ...episodeGraphs,
-          [currentEpisodeId]: {
+        arcGraphs: {
+          ...arcGraphs,
+          [currentArcId]: {
             ...currentGraph,
             edges: addEdge(
-              { 
-                ...connection, 
-                animated: true, 
-                style: { stroke: '#ef4444', strokeWidth: 2.5 } 
-              }, 
+              { ...connection, animated: true, style: { stroke: edgeColor, strokeWidth: 2.5 } }, 
               currentGraph.edges
             ),
           }
         }
       })
-
-      saveCurrentEpisode()
     },
 
     setSelectedNode: (node: StoryNode | null) => {
@@ -409,174 +265,63 @@ export const useStoryStore = create<StoryState>()(
     },
 
     addNode: (type: string, position?: { x: number, y: number }, initialData?: any) => {
-      const { currentEpisodeId, episodeGraphs, currentLayer, saveCurrentEpisode } = get()
-      
-      if (!currentEpisodeId || !episodeGraphs[currentEpisodeId]) {
-        console.error('Cannot add node: No active episode selected.')
-        return
-      }
+      const { currentArcId, arcGraphs } = get()
+      if (!currentArcId || !arcGraphs[currentArcId]) return
 
-      const currentGraph = episodeGraphs[currentEpisodeId]
+      const currentGraph = arcGraphs[currentArcId]
       const id = `${type}-${nanoid(5)}`
       
-      // Auto-switch layer if adding invisible node
-      if (currentLayer !== 'Story Graph') {
-        let isVisible = false
-        if (currentLayer === 'Logic Layer' && (type === 'choice' || type === 'dialogue')) isVisible = true
-        if (currentLayer === 'Cinematic Path' && (type === 'scene' || type === 'dialogue')) isVisible = true
-        if (currentLayer === 'Director Notes' && (type === 'character' || type === 'scene')) isVisible = true
-        
-        if (!isVisible) {
-          set({ currentLayer: 'Story Graph' })
-        }
-      }
-
-      let nodeData: any = initialData || {}
-      
-      if (!initialData) {
-        if (type === 'scene') {
-          nodeData = { title: 'New Scene', description: 'Scene description...', image: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=1200&auto=format&fit=crop', characters: [] }
-        } else if (type === 'dialogue') {
-          nodeData = { character: 'New Character', dialogue: 'Dialogue line...' }
-        } else if (type === 'choice') {
-          nodeData = { question: 'Make a choice?', options: ['Option A', 'Option B'] }
-        } else if (type === 'character') {
-          nodeData = { name: 'New Character', role: 'Unknown Role', personality: 'Character traits...', image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=1200&auto=format&fit=crop' }
-        }
-      }
-
       const newNode: StoryNode = {
         id,
-        type,
+        type: type === 'choice' ? 'choice' : 'characterScene',
         position: position || { x: 100, y: 100 },
-        data: nodeData,
+        data: { 
+          character: initialData?.character || 'System',
+          color: initialData?.color || '#ffffff',
+          title: 'New Scene',
+          description: '',
+          ...initialData
+        },
       }
 
       set({
-        lastEditTime: Date.now(),
-        episodeGraphs: {
-          ...episodeGraphs,
-          [currentEpisodeId]: {
+        arcGraphs: {
+          ...arcGraphs,
+          [currentArcId]: {
             ...currentGraph,
             nodes: [...currentGraph.nodes, newNode],
           }
         }
       })
-
-      // Sync to backend immediately
-      saveCurrentEpisode()
     },
 
     updateNodeData: (nodeId: string, data: any) => {
-      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
-      const currentGraph = episodeGraphs[currentEpisodeId]
-      const updatedNode = currentGraph.nodes.find(n => n.id === nodeId)
-      
-      if (!updatedNode) return
-
-      let newNodes = currentGraph.nodes.map((node) => {
-        if (node.id === nodeId) {
-          return { ...node, data: { ...node.data, ...data } }
-        }
-        if (updatedNode.type === 'character' && data.name) {
-          if (node.type === 'dialogue' && node.data.character === updatedNode.data.name) {
-            return { ...node, data: { ...node.data, character: data.name } }
-          }
-        }
-        return node
-      })
+      const { currentArcId, arcGraphs } = get()
+      const currentGraph = arcGraphs[currentArcId]
+      if (!currentGraph) return
 
       set({
-        lastEditTime: Date.now(),
-        episodeGraphs: {
-          ...episodeGraphs,
-          [currentEpisodeId]: {
+        arcGraphs: {
+          ...arcGraphs,
+          [currentArcId]: {
             ...currentGraph,
-            nodes: newNodes,
+            nodes: currentGraph.nodes.map((node) => 
+              node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node
+            ),
           }
         }
       })
-      
-      if (get().selectedNode?.id === nodeId) {
-        set({ selectedNode: newNodes.find(n => n.id === nodeId) || null })
-      }
-
-      saveCurrentEpisode()
-    },
-
-    addChoiceOption: (nodeId: string) => {
-      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
-      const currentGraph = episodeGraphs[currentEpisodeId]
-      
-      const newNodes = currentGraph.nodes.map((node) => {
-        if (node.id === nodeId && node.type === 'choice') {
-          const options = [...(node.data.options || []), `New Option ${node.data.options.length + 1}`]
-          return { ...node, data: { ...node.data, options } }
-        }
-        return node
-      })
-
-      set({
-        lastEditTime: Date.now(),
-        episodeGraphs: {
-          ...episodeGraphs,
-          [currentEpisodeId]: {
-            ...currentGraph,
-            nodes: newNodes,
-          }
-        }
-      })
-      
-      if (get().selectedNode?.id === nodeId) {
-        set({ selectedNode: newNodes.find(n => n.id === nodeId) || null })
-      }
-
-      saveCurrentEpisode()
-    },
-
-    removeChoiceOption: (nodeId: string, index: number) => {
-      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
-      const currentGraph = episodeGraphs[currentEpisodeId]
-      
-      const newNodes = currentGraph.nodes.map((node) => {
-        if (node.id === nodeId && node.type === 'choice') {
-          const options = node.data.options.filter((_: any, i: number) => i !== index)
-          return { ...node, data: { ...node.data, options } }
-        }
-        return node
-      })
-      
-      const newEdges = currentGraph.edges.filter(edge => {
-        return !(edge.source === nodeId && edge.sourceHandle === `option-${index}`)
-      })
-
-      set({
-        lastEditTime: Date.now(),
-        episodeGraphs: {
-          ...episodeGraphs,
-          [currentEpisodeId]: {
-            nodes: newNodes,
-            edges: newEdges,
-          }
-        }
-      })
-      
-      if (get().selectedNode?.id === nodeId) {
-        set({ selectedNode: newNodes.find(n => n.id === nodeId) || null })
-      }
-
-      saveCurrentEpisode()
     },
 
     deleteNode: (nodeId: string) => {
-      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
-      const currentGraph = episodeGraphs[currentEpisodeId]
+      const { currentArcId, arcGraphs } = get()
+      const currentGraph = arcGraphs[currentArcId]
+      if (!currentGraph) return
 
       set({
-        lastEditTime: Date.now(),
-        episodeGraphs: {
-          ...episodeGraphs,
-          [currentEpisodeId]: {
+        arcGraphs: {
+          ...arcGraphs,
+          [currentArcId]: {
             nodes: currentGraph.nodes.filter((node) => node.id !== nodeId),
             edges: currentGraph.edges.filter(
               (edge) => edge.source !== nodeId && edge.target !== nodeId
@@ -585,101 +330,52 @@ export const useStoryStore = create<StoryState>()(
         },
         selectedNode: get().selectedNode?.id === nodeId ? null : get().selectedNode,
       })
-
-      saveCurrentEpisode()
     },
 
-    addEpisode: async (id: string, title: string, description: string) => {
-      const newEp = { id, title, description }
+    addChoiceOption: (nodeId: string) => {
+      const { currentArcId, arcGraphs } = get()
+      const currentGraph = arcGraphs[currentArcId]
+      if (!currentGraph) return
       
-      set({ 
-        episodes: [...get().episodes, newEp],
-        episodeGraphs: {
-          ...get().episodeGraphs,
-          [id]: { nodes: [], edges: [] }
-        },
-        currentEpisodeId: id
-      })
-
-      // Proactively save new episode to backend
-      try {
-        await fetch(`${API_URL}/episodes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newEp)
-        })
-        console.log(`✅ StoryBoard: Episode "${title}" created and saved.`)
-      } catch (error) {
-        console.error('❌ StoryBoard: Failed to persist new episode:', error)
-      }
-    },
-
-    updateEpisode: (id: string, data: Partial<Episode>) => {
       set({
-        episodes: get().episodes.map(ep => ep.id === id ? { ...ep, ...data } : ep)
-      })
-    },
-
-    setCurrentEpisode: (id: string) => {
-      set({ currentEpisodeId: id, selectedNode: null })
-    },
-
-    addCharacterAsset: (asset: CharacterAsset) => {
-      set({ characterAssets: [...get().characterAssets, asset] })
-    },
-
-    deleteCharacterAsset: async (id: string) => {
-      const { characterAssets, episodeGraphs, currentEpisodeId, saveCurrentEpisode } = get()
-      
-      // 1. Remove from moodboard
-      set({ characterAssets: characterAssets.filter(c => c.id !== id) })
-      
-      // 2. Remove any nodes in the graph that belong to this character
-      // We look for 'character' nodes where the ID or Name matches
-      const charToDelete = characterAssets.find(c => c.id === id)
-      
-      const newGraphs = { ...episodeGraphs }
-      let changed = false
-
-      Object.keys(newGraphs).forEach(epId => {
-        const graph = newGraphs[epId]
-        const filteredNodes = graph.nodes.filter(node => {
-          // If it's a character node and matches the asset ID
-          if (node.type === 'character' && (node.id === id || node.data.name === charToDelete?.name)) {
-            changed = true
-            return false
-          }
-          return true
-        })
-
-        if (filteredNodes.length !== graph.nodes.length) {
-          newGraphs[epId] = {
-            ...graph,
-            nodes: filteredNodes,
-            edges: graph.edges.filter(edge => 
-              filteredNodes.some(n => n.id === edge.source) && 
-              filteredNodes.some(n => n.id === edge.target)
-            )
+        arcGraphs: {
+          ...arcGraphs,
+          [currentArcId]: {
+            ...currentGraph,
+            nodes: currentGraph.nodes.map((node) => {
+              if (node.id === nodeId) {
+                const options = [...(node.data.options || []), `New Option ${(node.data.options?.length || 0) + 1}`]
+                return { ...node, data: { ...node.data, options } }
+              }
+              return node
+            }),
           }
         }
       })
-
-      if (changed) {
-        set({ episodeGraphs: newGraphs })
-        saveCurrentEpisode()
-      }
-
-      // 3. Delete from backend
-      try {
-        await fetch(`${API_URL}/characters/${id}`, { method: 'DELETE' })
-        console.log('✅ StoryBoard: Character asset deleted from backend.')
-      } catch (error) {
-        console.error('❌ StoryBoard: Failed to delete character from backend:', error)
-      }
     },
 
-    setLayer: (layer: string) => {
-      set({ currentLayer: layer })
+    removeChoiceOption: (nodeId: string, index: number) => {
+      const { currentArcId, arcGraphs } = get()
+      const currentGraph = arcGraphs[currentArcId]
+      if (!currentGraph) return
+      
+      const newNodes = currentGraph.nodes.map((node) => {
+        if (node.id === nodeId) {
+          const options = (node.data.options || []).filter((_: any, i: number) => i !== index)
+          return { ...node, data: { ...node.data, options } }
+        }
+        return node
+      })
+      
+      set({
+        arcGraphs: {
+          ...arcGraphs,
+          [currentArcId]: {
+            nodes: newNodes,
+            edges: currentGraph.edges.filter(edge => !(edge.source === nodeId && edge.sourceHandle === `option-${index}`))
+          }
+        }
+      })
     }
   }))
 )
