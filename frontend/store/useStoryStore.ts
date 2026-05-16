@@ -202,22 +202,29 @@ export const useStoryStore = create<StoryState>()(
             character: n.data.character,
             type: n.type,
             length: n.data.description?.length || 0,
-            has_branches: n.data.options?.length > 0
+            has_branches: (n.data.options?.length || 0) > 0
           }
         }))
 
         const updateRes = await fetch(`${API_URL}/arcs/${currentArc.id}?user_id=${state.userId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodes: optimizedNodes, edges: graph.edges })
+          body: JSON.stringify({ 
+            nodes: optimizedNodes, 
+            edges: graph.edges,
+            title: currentArc.title,
+            description: currentArc.description
+          })
         })
 
         if (updateRes.ok) {
           console.log('✅ StoryBoard: Publish complete.')
-          set({ lockedBy: null }) // Unlock locally after successful publish
+          // Auto-reload arcs to ensure metadata (like title changes) are synced
+          get().loadArcs()
           window.dispatchEvent(new CustomEvent('arc-sync-complete'))
         } else if (updateRes.status === 423) {
            alert("Failed to publish: This Arc is locked by another user.")
+           get().loadArcs()
         }
       } catch (error) {
         console.error('❌ StoryBoard: Publish failed.', error)
@@ -245,6 +252,7 @@ export const useStoryStore = create<StoryState>()(
     deleteArc: async (id: string) => {
       const { arcs, currentArcId, arcGraphs } = get()
       const newArcs = arcs.filter(arc => arc.id !== id)
+      
       const newGraphs = { ...arcGraphs }
       delete newGraphs[id]
 

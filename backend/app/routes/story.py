@@ -25,7 +25,15 @@ def get_arcs(db: Session = Depends(get_db)):
 
 @router.post("/arcs", response_model=Arc)
 def create_arc(arc: ArcCreate, db: Session = Depends(get_db)):
-    db_arc = ArcModel(id=arc.id, title=arc.title, description=arc.description, nodes="[]", edges="[]")
+    db_arc = ArcModel(
+        id=arc.id, 
+        title=arc.title, 
+        description=arc.description, 
+        nodes="[]", 
+        edges="[]",
+        locked_by=None,
+        locked_at=None
+    )
     db.add(db_arc)
     db.commit()
     db.refresh(db_arc)
@@ -48,15 +56,15 @@ def update_arc(arc_id: str, arc_update: ArcUpdate, user_id: Optional[str] = None
     if arc_update.edges is not None:
         db_arc.edges = json.dumps(arc_update.edges)
     
-    # Auto-unlock on save if user_id is provided
-    if user_id and db_arc.locked_by == user_id:
-        db_arc.locked_by = None
-        db_arc.locked_at = None
-
+    # We NO LONGER auto-unlock on save here to prevent race conditions during long sessions.
+    # The frontend will call /unlock explicitly or it will stay locked while they work.
+    
     db.commit()
     db.refresh(db_arc)
-    db_arc.nodes = json.loads(db_arc.nodes)
-    db_arc.edges = json.loads(db_arc.edges)
+    
+    # Critical fix: Ensure returned data is parsed for the response model
+    db_arc.nodes = json.loads(db_arc.nodes) if isinstance(db_arc.nodes, str) else db_arc.nodes
+    db_arc.edges = json.loads(db_arc.edges) if isinstance(db_arc.edges, str) else db_arc.edges
     return db_arc
 
 @router.post("/arcs/{arc_id}/lock")
