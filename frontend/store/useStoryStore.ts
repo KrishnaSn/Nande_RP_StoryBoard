@@ -89,9 +89,9 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8000'
 
 export const useStoryStore = create<StoryState>()(
   temporal((set, get) => ({
-    episodes: [],
-    currentEpisodeId: '',
-    episodeGraphs: {},
+    episodes: [{ id: 'ep-1', title: 'The Prologue', description: 'The beginning.' }],
+    currentEpisodeId: 'ep-1',
+    episodeGraphs: { 'ep-1': { nodes: [], edges: [] } },
     characterAssets: [],
     selectedNode: null,
     currentLayer: 'Story Graph',
@@ -152,13 +152,16 @@ export const useStoryStore = create<StoryState>()(
         await get().loadCharacters()
 
         const res = await fetch(`${API_URL}/episodes`)
-        if (!res.ok) throw new Error('Network response was not ok')
+        if (!res.ok) throw new Error(`Backend fetch failed with status: ${res.status}`)
         const data = await res.json()
         
         if (data && data.length > 0) {
           const loadedGraphs: Record<string, EpisodeData> = {}
           const loadedEpisodes = data.map((ep: any) => {
-            loadedGraphs[ep.id] = { nodes: ep.nodes || [], edges: ep.edges || [] }
+            loadedGraphs[ep.id] = { 
+              nodes: typeof ep.nodes === 'string' ? JSON.parse(ep.nodes) : (ep.nodes || []), 
+              edges: typeof ep.edges === 'string' ? JSON.parse(ep.edges) : (ep.edges || []) 
+            }
             return { id: ep.id, title: ep.title, description: ep.description }
           })
 
@@ -167,17 +170,39 @@ export const useStoryStore = create<StoryState>()(
             episodeGraphs: loadedGraphs,
             currentEpisodeId: loadedEpisodes[0].id
           })
+          console.log('✅ StoryBoard: Episodes loaded from backend.')
         } else {
-          // If no episodes, create a default one
-          const defaultId = 'ep-1'
+          // If no episodes, create a default one and SAVE it immediately
+          const defaultId = `ep-${nanoid(5)}`
+          const defaultEp = { id: defaultId, title: 'The Prologue', description: 'The beginning of your story.' }
+          
           set({
-            episodes: [{ id: defaultId, title: 'The Prologue', description: 'The beginning.' }],
+            episodes: [defaultEp],
+            episodeGraphs: { [defaultId]: { nodes: [], edges: [] } },
+            currentEpisodeId: defaultId
+          })
+          
+          // Auto-save the new default episode to backend
+          fetch(`${API_URL}/episodes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(defaultEp)
+          }).catch(err => console.error('Failed to auto-save default episode:', err))
+
+          console.log('ℹ️ StoryBoard: No episodes found, initialized and saved default.')
+        }
+      } catch (error) {
+        console.error('❌ StoryBoard: Failed to load from backend. Falling back to offline mode.', error)
+        
+        // CRITICAL FIX: Ensure we have at least one episode to enable node creation
+        if (get().episodes.length === 0) {
+          const defaultId = 'ep-offline'
+          set({
+            episodes: [{ id: defaultId, title: 'Offline Workspace', description: 'Backend unreachable. Nodes can still be added but will not persist.' }],
             episodeGraphs: { [defaultId]: { nodes: [], edges: [] } },
             currentEpisodeId: defaultId
           })
         }
-      } catch (error) {
-        console.error('Failed to load episodes from backend:', error)
       }
     },
 

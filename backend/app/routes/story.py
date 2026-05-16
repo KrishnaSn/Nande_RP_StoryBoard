@@ -19,7 +19,7 @@ async def upload_image(file: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    base_url = os.getenv("BASE_URL", "http://localhost:8000")
+    base_url = os.getenv("BASE_URL", "http://localhost:8000").rstrip("/")
     return {"url": f"{base_url}/uploads/{file.filename}"}
 
 @router.get("/episodes", response_model=list[Episode])
