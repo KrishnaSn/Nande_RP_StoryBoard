@@ -46,6 +46,7 @@ interface StoryState {
   selectedNode: StoryNode | null
   currentLayer: string
   hasInitialized: boolean
+  lastEditTime: number
   
   // Computed (getters)
   getNodes: () => StoryNode[]
@@ -98,6 +99,7 @@ export const useStoryStore = create<StoryState>()(
     selectedNode: null,
     currentLayer: 'Story Graph',
     hasInitialized: false,
+    lastEditTime: 0,
 
     loadCharacters: async () => {
       try {
@@ -279,7 +281,7 @@ export const useStoryStore = create<StoryState>()(
         console.error('Failed to save episode:', error)
       }
     },
-// ... (getNodes and other methods)
+
     deleteEpisode: async (id: string) => {
       const { episodes, currentEpisodeId, episodeGraphs } = get()
       
@@ -451,6 +453,7 @@ export const useStoryStore = create<StoryState>()(
       }
 
       set({
+        lastEditTime: Date.now(),
         episodeGraphs: {
           ...episodeGraphs,
           [currentEpisodeId]: {
@@ -484,6 +487,7 @@ export const useStoryStore = create<StoryState>()(
       })
 
       set({
+        lastEditTime: Date.now(),
         episodeGraphs: {
           ...episodeGraphs,
           [currentEpisodeId]: {
@@ -513,6 +517,7 @@ export const useStoryStore = create<StoryState>()(
       })
 
       set({
+        lastEditTime: Date.now(),
         episodeGraphs: {
           ...episodeGraphs,
           [currentEpisodeId]: {
@@ -546,6 +551,7 @@ export const useStoryStore = create<StoryState>()(
       })
 
       set({
+        lastEditTime: Date.now(),
         episodeGraphs: {
           ...episodeGraphs,
           [currentEpisodeId]: {
@@ -567,6 +573,7 @@ export const useStoryStore = create<StoryState>()(
       const currentGraph = episodeGraphs[currentEpisodeId]
 
       set({
+        lastEditTime: Date.now(),
         episodeGraphs: {
           ...episodeGraphs,
           [currentEpisodeId]: {
@@ -676,5 +683,3 @@ export const useStoryStore = create<StoryState>()(
     }
   }))
 )
-
-
