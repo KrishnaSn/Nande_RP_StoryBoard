@@ -1,33 +1,39 @@
 import { Handle, Position } from 'reactflow'
+import { Clapperboard } from 'lucide-react'
 
-export default function SceneNode({ data }: any) {
+export default function SceneNode({ data, selected }: any) {
   return (
-    <div className="w-80 overflow-hidden rounded-2xl border border-zinc-700 bg-[#181818]">
-      <Handle type="target" position={Position.Left} />
+    <div className={`node-container w-80 overflow-hidden rounded-xl border ${selected ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'border-white/10'} bg-[#0d0d0d] shadow-2xl transition-all duration-300`}>
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        className="!w-3 !h-3 !bg-[#050505] !border-2 !border-emerald-500 !rounded-sm hover:!bg-emerald-500 transition-colors" 
+      />
+      
+      <div className="node-header bg-emerald-500/10 text-emerald-400">
+        <Clapperboard size={14} />
+        <span>Scene Node</span>
+      </div>
 
       <img
         src={data.image}
-        className="h-44 w-full object-cover"
+        className="h-40 w-full object-cover opacity-80"
       />
 
-      <div className="p-5">
-        <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs text-red-300">
-          SCENE
-        </span>
-
-        <h3 className="mt-4 text-2xl font-black text-white">
+      <div className="p-4">
+        <h3 className="text-lg font-bold text-white tracking-tight">
           {data.title}
         </h3>
 
-        <p className="mt-3 text-sm text-zinc-400">
+        <p className="mt-2 text-xs leading-relaxed text-zinc-400">
           {data.description}
         </p>
 
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-1.5">
           {data.characters?.map((char: string) => (
             <span
               key={char}
-              className="rounded-full bg-zinc-800 px-3 py-1 text-xs"
+              className="rounded-md bg-zinc-800/50 border border-white/5 px-2 py-0.5 text-[10px] font-medium text-zinc-300"
             >
               {char}
             </span>
@@ -35,7 +41,11 @@ export default function SceneNode({ data }: any) {
         </div>
       </div>
 
-      <Handle type="source" position={Position.Right} />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        className="!w-3 !h-3 !bg-[#050505] !border-2 !border-emerald-500 !rounded-sm hover:!bg-emerald-500 transition-colors" 
+      />
     </div>
   )
 }
