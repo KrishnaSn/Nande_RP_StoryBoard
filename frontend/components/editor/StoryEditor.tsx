@@ -21,6 +21,7 @@ import SceneModal from './SceneModal'
 import ContextMenu from './ContextMenu'
 import SaveSyncModal from './SaveSyncModal'
 import LockedOverlay from './LockedOverlay'
+import DeviceGuard from './DeviceGuard'
 
 const nodeTypes = {
   characterScene: CharacterSceneNode,
@@ -174,6 +175,7 @@ function FlowEditor() {
 
   return (
     <div className="flex flex-col h-screen bg-[#050505] text-white selection:bg-red-500/30">
+      <DeviceGuard />
       <TopBar />
       
       <div className="flex flex-1 overflow-hidden relative">
