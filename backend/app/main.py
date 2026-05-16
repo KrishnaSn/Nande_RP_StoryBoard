@@ -8,8 +8,7 @@ from app.models.story import ArcModel
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Temporarily drop all to sync schema changes (locking system)
-    Base.metadata.drop_all(bind=engine) 
+    # Create database tables on startup
     Base.metadata.create_all(bind=engine)
     yield
 

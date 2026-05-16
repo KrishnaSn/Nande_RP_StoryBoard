@@ -63,9 +63,11 @@ def update_arc(arc_id: str, arc_update: ArcUpdate, user_id: Optional[str] = None
     if arc_update.edges is not None:
         db_arc.edges = json.dumps(arc_update.edges)
     
-    # We NO LONGER auto-unlock on save here to prevent race conditions during long sessions.
-    # The frontend will call /unlock explicitly or it will stay locked while they work.
-    
+    # Auto-unlock on save if user_id matches the lock owner
+    if user_id and db_arc.locked_by == user_id:
+        db_arc.locked_by = None
+        db_arc.locked_at = None
+
     db.commit()
     db.refresh(db_arc)
     
