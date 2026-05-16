@@ -128,12 +128,12 @@ export const useStoryStore = create<StoryState>()(
       try {
         const formData = new FormData()
         formData.append('file', file)
-        
+
         const res = await fetch(`${API_URL}/upload`, {
           method: 'POST',
           body: formData
         })
-        
+
         if (res.ok) {
           const data = await res.json()
           return data.url
@@ -144,6 +144,7 @@ export const useStoryStore = create<StoryState>()(
         throw error
       }
     },
+
 
     loadEpisodes: async () => {
       try {
@@ -260,9 +261,10 @@ export const useStoryStore = create<StoryState>()(
     },
 
     onNodesChange: (changes: NodeChange[]) => {
-      const { currentEpisodeId, episodeGraphs } = get()
+      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
       const currentGraph = episodeGraphs[currentEpisodeId]
-      
+      if (!currentGraph) return
+
       set({
         episodeGraphs: {
           ...episodeGraphs,
@@ -272,12 +274,16 @@ export const useStoryStore = create<StoryState>()(
           }
         }
       })
+      
+      // Auto-save on movement/changes
+      saveCurrentEpisode()
     },
 
     onEdgesChange: (changes: EdgeChange[]) => {
-      const { currentEpisodeId, episodeGraphs } = get()
+      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
       const currentGraph = episodeGraphs[currentEpisodeId]
-      
+      if (!currentGraph) return
+
       set({
         episodeGraphs: {
           ...episodeGraphs,
@@ -287,12 +293,15 @@ export const useStoryStore = create<StoryState>()(
           }
         }
       })
+
+      saveCurrentEpisode()
     },
 
     onConnect: (connection: Connection) => {
-      const { currentEpisodeId, episodeGraphs } = get()
+      const { currentEpisodeId, episodeGraphs, saveCurrentEpisode } = get()
       const currentGraph = episodeGraphs[currentEpisodeId]
-      
+      if (!currentGraph) return
+
       set({
         episodeGraphs: {
           ...episodeGraphs,
@@ -309,6 +318,8 @@ export const useStoryStore = create<StoryState>()(
           }
         }
       })
+
+      saveCurrentEpisode()
     },
 
     setSelectedNode: (node: StoryNode | null) => {
@@ -317,6 +328,12 @@ export const useStoryStore = create<StoryState>()(
 
     addNode: (type: string, position?: { x: number, y: number }, initialData?: any) => {
       const { currentEpisodeId, episodeGraphs, currentLayer } = get()
+      
+      if (!currentEpisodeId || !episodeGraphs[currentEpisodeId]) {
+        console.error('Cannot add node: No active episode selected.')
+        return
+      }
+
       const currentGraph = episodeGraphs[currentEpisodeId]
       const id = `${type}-${nanoid(5)}`
       
