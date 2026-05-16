@@ -3,7 +3,7 @@
 import { Handle, Position } from 'reactflow'
 import { GitBranch, Settings } from 'lucide-react'
 
-export default function ChoiceNode({ data, selected }: any) {
+export default function ChoiceNode({ id, data, selected }: any) {
   const accentColor = '#f59e0b' // Amber
 
   return (
@@ -36,7 +36,7 @@ export default function ChoiceNode({ data, selected }: any) {
           className="p-1 rounded hover:bg-white/5 text-zinc-500 hover:text-white transition-colors"
           onClick={(e) => {
             e.stopPropagation()
-            window.dispatchEvent(new CustomEvent('open-scene-modal', { detail: { nodeId: data.id || '' } }))
+            window.dispatchEvent(new CustomEvent('open-scene-modal', { detail: { nodeId: id } }))
           }}
         >
           <Settings size={12} />

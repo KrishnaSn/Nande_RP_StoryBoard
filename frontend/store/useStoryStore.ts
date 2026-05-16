@@ -22,6 +22,8 @@ export interface Arc {
   id: string
   title: string
   description: string
+  locked_by?: string
+  locked_at?: string
 }
 
 interface ArcData {
@@ -36,6 +38,9 @@ interface StoryState {
   arcGraphs: Record<string, ArcData>
   selectedNode: StoryNode | null
   hasInitialized: boolean
+  isPresenting: boolean
+  userId: string
+  lockedBy: string | null
   
   // Computed (getters)
   getNodes: () => StoryNode[]
@@ -60,12 +65,28 @@ interface StoryState {
   deleteArc: (id: string) => Promise<void>
   setCurrentArc: (id: string) => void
 
+  // UI Actions
+  togglePresentMode: () => void
+
   // Backend Synchronization (MANUAL ONLY)
   loadArcs: () => Promise<void>
   saveCurrentArc: () => Promise<void>
+  acquireLock: (arcId: string) => Promise<boolean>
+  releaseLock: (arcId: string) => Promise<void>
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+
+// Get or generate persistent User ID
+const getUserId = () => {
+  if (typeof window === 'undefined') return 'server'
+  let id = localStorage.getItem('nande_user_id')
+  if (!id) {
+    id = `user-${nanoid(5)}`
+    localStorage.setItem('nande_user_id', id)
+  }
+  return id
+}
 
 export const useStoryStore = create<StoryState>()(
   temporal((set, get) => ({
@@ -74,6 +95,9 @@ export const useStoryStore = create<StoryState>()(
     arcGraphs: {},
     selectedNode: null,
     hasInitialized: false,
+    isPresenting: false,
+    userId: getUserId(),
+    lockedBy: null,
 
     loadArcs: async () => {
       try {
@@ -88,14 +112,24 @@ export const useStoryStore = create<StoryState>()(
               nodes: typeof ep.nodes === 'string' ? JSON.parse(ep.nodes) : (ep.nodes || []), 
               edges: typeof ep.edges === 'string' ? JSON.parse(ep.edges) : (ep.edges || []) 
             }
-            return { id: ep.id, title: ep.title, description: ep.description }
+            return { 
+              id: ep.id, 
+              title: ep.title, 
+              description: ep.description,
+              locked_by: ep.locked_by,
+              locked_at: ep.locked_at
+            }
           })
+
+          const currentId = get().currentArcId || loadedArcs[0].id
+          const activeArc = loadedArcs.find((a: Arc) => a.id === currentId)
 
           set({ 
             arcs: loadedArcs, 
             arcGraphs: loadedGraphs,
             hasInitialized: true,
-            currentArcId: get().currentArcId || loadedArcs[0].id
+            currentArcId: currentId,
+            lockedBy: activeArc?.locked_by || null
           })
           console.log('📦 StoryBoard: Arcs synchronized from cloud.')
         } else if (!get().hasInitialized) {
@@ -107,7 +141,6 @@ export const useStoryStore = create<StoryState>()(
             currentArcId: defaultId,
             hasInitialized: true
           })
-          // Initial auto-save for new users only
           fetch(`${API_URL}/arcs`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -117,6 +150,40 @@ export const useStoryStore = create<StoryState>()(
       } catch (error) {
         console.error('❌ StoryBoard: Cloud sync failed. Working in local mode.', error)
       }
+    },
+
+    acquireLock: async (arcId: string) => {
+       try {
+         const res = await fetch(`${API_URL}/arcs/${arcId}/lock`, {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ user_id: get().userId })
+         })
+         const data = await res.json()
+         if (data.status === 'acquired') {
+           set({ lockedBy: get().userId })
+           return true
+         } else {
+           set({ lockedBy: data.locked_by })
+           return false
+         }
+       } catch (error) {
+         console.error('Lock acquisition failed:', error)
+         return false
+       }
+    },
+
+    releaseLock: async (arcId: string) => {
+       try {
+         await fetch(`${API_URL}/arcs/${arcId}/unlock`, {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ user_id: get().userId })
+         })
+         set({ lockedBy: null })
+       } catch (error) {
+         console.error('Lock release failed:', error)
+       }
     },
 
     saveCurrentArc: async () => {
@@ -129,7 +196,6 @@ export const useStoryStore = create<StoryState>()(
       try {
         console.log(`📡 StoryBoard: Publishing Arc "${currentArc.title}"...`)
         
-        // LLM OPTIMIZATION: Ensure nodes have explicit metadata tags before saving
         const optimizedNodes = graph.nodes.map(n => ({
           ...n,
           meta: { 
@@ -140,7 +206,7 @@ export const useStoryStore = create<StoryState>()(
           }
         }))
 
-        const updateRes = await fetch(`${API_URL}/arcs/${currentArc.id}`, {
+        const updateRes = await fetch(`${API_URL}/arcs/${currentArc.id}?user_id=${state.userId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nodes: optimizedNodes, edges: graph.edges })
@@ -148,15 +214,16 @@ export const useStoryStore = create<StoryState>()(
 
         if (updateRes.ok) {
           console.log('✅ StoryBoard: Publish complete.')
-          // Trigger the success modal
+          set({ lockedBy: null }) // Unlock locally after successful publish
           window.dispatchEvent(new CustomEvent('arc-sync-complete'))
+        } else if (updateRes.status === 423) {
+           alert("Failed to publish: This Arc is locked by another user.")
         }
       } catch (error) {
         console.error('❌ StoryBoard: Publish failed.', error)
       }
     },
 
-    // ARC MANAGEMENT (LOCAL FIRST)
     addArc: async (id: string, title: string, description: string) => {
       const newArc = { id, title, description }
       set({ 
@@ -164,7 +231,6 @@ export const useStoryStore = create<StoryState>()(
         arcGraphs: { ...get().arcGraphs, [id]: { nodes: [], edges: [] } },
         currentArcId: id
       })
-      // Publish creation immediately
       fetch(`${API_URL}/arcs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,7 +245,6 @@ export const useStoryStore = create<StoryState>()(
     deleteArc: async (id: string) => {
       const { arcs, currentArcId, arcGraphs } = get()
       const newArcs = arcs.filter(arc => arc.id !== id)
-      
       const newGraphs = { ...arcGraphs }
       delete newGraphs[id]
 
@@ -192,7 +257,12 @@ export const useStoryStore = create<StoryState>()(
     },
 
     setCurrentArc: (id: string) => {
-      set({ currentArcId: id, selectedNode: null })
+      const arc = get().arcs.find(a => a.id === id)
+      set({ currentArcId: id, selectedNode: null, lockedBy: arc?.locked_by || null })
+    },
+
+    togglePresentMode: () => {
+      set({ isPresenting: !get().isPresenting })
     },
 
     // GRAPH ENGINE (100% LOCAL FOR SPEED)
@@ -278,8 +348,9 @@ export const useStoryStore = create<StoryState>()(
         data: { 
           character: initialData?.character || 'System',
           color: initialData?.color || '#ffffff',
-          title: 'New Scene',
+          title: type === 'choice' ? 'Decision Point' : 'New Scene',
           description: '',
+          options: type === 'choice' ? ['Option A', 'Option B'] : undefined,
           ...initialData
         },
       }

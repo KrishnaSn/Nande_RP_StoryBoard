@@ -5,16 +5,15 @@ import { useStoryStore } from '../../store/useStoryStore'
 import { useReactFlow } from 'reactflow'
 
 export default function LeftToolbox() {
-  const { addNode } = useStoryStore()
+  const { addNode, isPresenting } = useStoryStore()
   const { project } = useReactFlow()
   
   const characters = [
     { name: 'RedParasite', color: '#ef4444' },
     { name: 'Chitty', color: '#3b82f6' },
-    { name: 'Siddharath Nayak', color: '#10b981' },
+    { name: 'Sanju', color: '#10b981' },
     { name: 'PR Hashtag', color: '#f59e0b' },
     { name: 'Obito', color: '#8b5cf6' },
-    { name: 'AJ', color: '#ec4899' },
     { name: 'Gabbar Singh', color: '#f97316' },
     { name: 'Krishna', color: '#06b6d4' },
   ]
@@ -44,7 +43,7 @@ export default function LeftToolbox() {
   }
 
   return (
-    <aside className="w-64 border-r border-white/5 bg-[#0d0d0d] flex flex-col z-20 relative">
+    <aside className={`w-64 border-r border-white/5 bg-[#0d0d0d] flex flex-col z-20 relative transition-all duration-500 ${isPresenting ? '-translate-x-full opacity-0 invisible' : 'translate-x-0 opacity-100 visible'}`}>
       <div className="ui-tag">[ASSET_TOOLBOX]</div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-8 scrollbar-hide">

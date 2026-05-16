@@ -5,7 +5,7 @@ import { Save, Play, Share2, Sparkles, Settings, Loader2, Check, Cloud } from 'l
 import { useStoryStore } from '../../store/useStoryStore'
 
 export default function TopBar() {
-  const { arcs, currentArcId, saveCurrentArc } = useStoryStore()
+  const { arcs, currentArcId, saveCurrentArc, isPresenting, togglePresentMode } = useStoryStore()
   const [isSaving, setIsSaving] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
 
@@ -20,7 +20,7 @@ export default function TopBar() {
   }
 
   return (
-    <header className="h-14 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between px-6 z-20 relative">
+    <header className={`h-14 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between px-6 z-20 relative transition-all duration-500 ${isPresenting ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'}`}>
       <div className="ui-tag">[GLOBAL_TOP_NAV]</div>
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-3">
@@ -67,7 +67,10 @@ export default function TopBar() {
           <span>{showSaved ? 'Arc Saved' : (isSaving ? 'Syncing...' : 'Save Arc')}</span>
         </button>
 
-        <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/10 border border-red-600/20 text-red-500 hover:bg-red-600 hover:text-white transition-all text-[10px] font-black uppercase shadow-lg shadow-red-600/5 group">
+        <button 
+          onClick={togglePresentMode}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/10 border border-red-600/20 text-red-500 hover:bg-red-600 hover:text-white transition-all text-[10px] font-black uppercase shadow-lg shadow-red-600/5 group ${isPresenting ? 'ring-2 ring-red-500' : ''}`}
+        >
           <Play size={14} fill="currentColor" className="group-hover:translate-x-0.5 transition-transform" />
           <span>Present Arc</span>
         </button>

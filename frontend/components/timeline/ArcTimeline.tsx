@@ -6,7 +6,7 @@ import { useStoryStore } from '../../store/useStoryStore'
 import { nanoid } from 'nanoid'
 
 export default function ArcTimeline() {
-  const { arcs, currentArcId, setCurrentArc, addArc, deleteArc, updateArc } = useStoryStore()
+  const { arcs, currentArcId, setCurrentArc, addArc, deleteArc, updateArc, isPresenting } = useStoryStore()
   const [showNewArcModal, setShowNewArcModal] = useState(false)
   const [newArcData, setNewArcData] = useState({ title: '', description: '' })
   const [editingArc, setEditingArc] = useState<string | null>(null)
@@ -26,7 +26,7 @@ export default function ArcTimeline() {
   }
 
   return (
-    <div className="h-24 border-t border-white/5 bg-[#0d0d0d] flex items-center px-6 gap-6 z-20 relative overflow-hidden">
+    <div className={`h-24 border-t border-white/5 bg-[#0d0d0d] flex items-center px-6 gap-6 z-20 relative overflow-hidden transition-all duration-500 ${isPresenting ? 'translate-y-full opacity-0 invisible' : 'translate-y-0 opacity-100 visible'}`}>
       <div className="ui-tag">[ARC_TIMELINE]</div>
       
       <div className="flex items-center gap-3 pr-6 border-r border-white/5">
