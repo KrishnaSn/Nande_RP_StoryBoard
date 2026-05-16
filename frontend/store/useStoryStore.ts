@@ -168,7 +168,7 @@ export const useStoryStore = create<StoryState>()(
         
         if (data && data.length > 0) {
           const loadedGraphs: Record<string, EpisodeData> = {}
-          const loadedEpisodes = data.map((ep: any) => {
+          const loadedEpisodes = data.map((ep: { id: string; nodes: string | StoryNode[]; edges: string | StoryEdge[]; title: string; description: string }) => {
             loadedGraphs[ep.id] = { 
               nodes: typeof ep.nodes === 'string' ? JSON.parse(ep.nodes) : (ep.nodes || []), 
               edges: typeof ep.edges === 'string' ? JSON.parse(ep.edges) : (ep.edges || []) 
@@ -187,7 +187,7 @@ export const useStoryStore = create<StoryState>()(
               episodes: loadedEpisodes, 
               episodeGraphs: loadedGraphs,
               // Keep current ID unless it was deleted by someone else
-              currentEpisodeId: loadedEpisodes.some(e => e.id === currentState.currentEpisodeId) 
+              currentEpisodeId: loadedEpisodes.some((e: Episode) => e.id === currentState.currentEpisodeId) 
                 ? currentState.currentEpisodeId 
                 : loadedEpisodes[0].id
             })
