@@ -30,7 +30,25 @@ def setup_db():
 def test_read_root():
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "FiveM Story Engine Backend Running"}
+    assert response.json()["status"] == "online"
+    assert "Nande RP StoryBoard" in response.json()["message"]
+
+def test_upload_image():
+    # Create a dummy file for testing
+    import io
+    file_content = b"fake image content"
+    file = io.BytesIO(file_content)
+    
+    response = client.post(
+        "/api/upload",
+        files={"file": ("test image.jpg", file, "image/jpeg")}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert "url" in data
+    # Ensure filename was cleaned (space replaced by underscore)
+    assert "test_image.jpg" in data["url"]
 
 def test_create_episode():
     response = client.post(
