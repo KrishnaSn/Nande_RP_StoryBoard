@@ -10,6 +10,8 @@ class ArcCreate(ArcBase):
     id: str
 
 class ArcUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
     nodes: Optional[List[Any]] = None
     edges: Optional[List[Any]] = None
 

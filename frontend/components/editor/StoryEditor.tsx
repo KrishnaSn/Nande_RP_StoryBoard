@@ -211,7 +211,7 @@ function FlowEditor() {
             }}
           >
             <Background color="#1a1a1a" gap={20} size={1} />
-            <Controls className="!bg-[#0d0d0d] !border-white/10 !shadow-2xl shadow-black/50 overflow-hidden !rounded-lg" />
+            <Controls className={`!bg-[#0d0d0d] !border-white/10 !shadow-2xl shadow-black/50 overflow-hidden !rounded-lg transition-all duration-500 ${isPresenting ? '!bottom-6 !left-6' : '!bottom-10 !left-10'}`} />
             
             <MiniMap 
               nodeColor={nodeColor}
@@ -219,7 +219,7 @@ function FlowEditor() {
               nodeStrokeWidth={3}
               nodeBorderRadius={2}
               maskColor="rgba(0, 0, 0, 0.6)"
-              className={`!bg-[#0d0d0d] !rounded-xl !border !border-white/10 !m-4 !shadow-2xl !shadow-black/50 transition-all duration-500 ${isPresenting ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+              className={`!bg-[#0d0d0d] !rounded-xl !border !border-white/10 !m-8 !shadow-2xl !shadow-black/50 transition-all duration-500 ${isPresenting ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}
               style={{
                 width: 180,
                 height: 120
@@ -228,7 +228,7 @@ function FlowEditor() {
               pannable
             />
 
-            <Panel position="bottom-right" className="m-4">
+            <Panel position="bottom-right" className="m-8">
                <div className={`px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-md flex items-center gap-2 shadow-2xl transition-all duration-500 ${isPresenting ? 'opacity-0 translate-y-10' : 'opacity-100 translate-y-0'}`}>
                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Build 2.2.0 Locked-Sync</span>
@@ -236,10 +236,10 @@ function FlowEditor() {
             </Panel>
 
             {isPresenting && (
-              <Panel position="top-right" className="m-6">
+              <Panel position="top-right" className="!m-4">
                 <button 
                   onClick={togglePresentMode}
-                  className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-black text-[10px] font-black uppercase shadow-2xl hover:bg-zinc-200 transition-all animate-in fade-in slide-in-from-top-4 duration-500"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-black text-[10px] font-black uppercase shadow-2xl hover:bg-zinc-200 transition-all animate-in fade-in slide-in-from-top-4 duration-500"
                 >
                   <Maximize2 size={16} />
                   <span>Exit Present Arc</span>

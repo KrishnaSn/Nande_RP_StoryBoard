@@ -206,28 +206,51 @@ export const useStoryStore = create<StoryState>()(
           }
         }))
 
-        const updateRes = await fetch(`${API_URL}/arcs/${currentArc.id}?user_id=${state.userId}`, {
+        const payload = { 
+          nodes: optimizedNodes, 
+          edges: graph.edges,
+          title: currentArc.title,
+          description: currentArc.description
+        }
+
+        let updateRes = await fetch(`${API_URL}/arcs/${currentArc.id}?user_id=${state.userId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            nodes: optimizedNodes, 
-            edges: graph.edges,
-            title: currentArc.title,
-            description: currentArc.description
-          })
+          body: JSON.stringify(payload)
         })
+
+        // CRITICAL FALLBACK: If Arc doesn't exist on server, create it first
+        if (updateRes.status === 404) {
+          console.warn('⚠️ Arc not found on server, attempting to re-create...')
+          await fetch(`${API_URL}/arcs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: currentArc.id, title: currentArc.title, description: currentArc.description })
+          })
+          // Retry the update
+          updateRes = await fetch(`${API_URL}/arcs/${currentArc.id}?user_id=${state.userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          })
+        }
 
         if (updateRes.ok) {
           console.log('✅ StoryBoard: Publish complete.')
-          // Auto-reload arcs to ensure metadata (like title changes) are synced
+          set({ lastLocalEdit: 0 })
           get().loadArcs()
           window.dispatchEvent(new CustomEvent('arc-sync-complete'))
         } else if (updateRes.status === 423) {
-           alert("Failed to publish: This Arc is locked by another user.")
+           alert("Sync Locked: Another contributor is currently editing this Arc.")
            get().loadArcs()
+        } else {
+           const errText = await updateRes.text()
+           alert(`Sync Failed: Server returned error ${updateRes.status}. Check console for details.`)
+           console.error('Server error:', errText)
         }
       } catch (error) {
         console.error('❌ StoryBoard: Publish failed.', error)
+        alert('Network Error: Could not connect to the cloud. Please check your internet.')
       }
     },
 
