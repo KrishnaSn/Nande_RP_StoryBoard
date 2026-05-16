@@ -43,15 +43,28 @@ function FlowEditor() {
     selectedNode,
     deleteNode,
     addNode,
-    loadEpisodes
+    loadEpisodes,
+    loadCharacters
   } = useStoryStore()
 
   const nodes = getNodes()
   const edges = getEdges()
 
+  // Initial load and Real-time Polling
   useEffect(() => {
+    // Initial load
     loadEpisodes()
-  }, [loadEpisodes])
+    
+    // Set up polling interval (every 10 seconds)
+    const interval = setInterval(() => {
+      // Only refresh if the user isn't actively moving a node to avoid jitter
+      // (React Flow handles its own state, but we fetch metadata/other users' nodes)
+      loadEpisodes()
+      loadCharacters()
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [loadEpisodes, loadCharacters])
 
   const { project } = useReactFlow()
   const temporal = useStoryStore.temporal

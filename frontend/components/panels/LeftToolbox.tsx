@@ -31,15 +31,30 @@ export default function LeftToolbox() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleCreateChar = async () => {
-    if (!charForm.name || !charForm.image) return
+    if (!charForm.name || !charForm.image) {
+      alert('Please provide both a name and an image for the character.')
+      return
+    }
+
+    // Security check: Warn user about local paths
+    if (charForm.image.startsWith('C:') || charForm.image.startsWith('D:') || charForm.image.startsWith('file:')) {
+      alert('Browser security prevents using local file paths (like D:\\...). Please use the upload button or a web URL.')
+      return
+    }
+
     setIsCreating(true)
-    await saveCharacterAsset({
+    const success = await saveCharacterAsset({
       id: `char-${nanoid(5)}`,
       ...charForm
     })
+
     setIsCreating(false)
-    setShowCharModal(false)
-    setCharData({ name: '', image: '', role: '', personality: '' })
+    if (success) {
+      setShowCharModal(false)
+      setCharData({ name: '', image: '', role: '', personality: '' })
+    } else {
+      alert('Failed to save character asset. Please check the console for details.')
+    }
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,8 +65,9 @@ export default function LeftToolbox() {
     try {
       const url = await uploadImage(file)
       setCharData({ ...charForm, image: url })
-    } catch (error) {
-      alert('Upload failed. Please try again.')
+    } catch (error: any) {
+      console.error('Upload error in component:', error)
+      alert(`Upload failed: ${error.message || 'Unknown error'}. Please check if the backend is running and BASE_URL is set.`)
     } finally {
       setIsUploading(false)
     }
