@@ -22,4 +22,6 @@ class CharacterAsset(BaseModel):
     id: str
     name: str
     image: str
+    role: Optional[str] = None
+    personality: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)

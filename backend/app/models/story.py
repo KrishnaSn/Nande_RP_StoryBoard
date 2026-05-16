@@ -16,3 +16,5 @@ class CharacterAssetModel(Base):
     id = Column(String, primary_key=True, index=True)
     name = Column(String)
     image = Column(String)
+    role = Column(String, nullable=True)
+    personality = Column(Text, nullable=True)

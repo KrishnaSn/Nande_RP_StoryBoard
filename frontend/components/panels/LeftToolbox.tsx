@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { 
   Clapperboard, 
   MessageSquareQuote, 
@@ -13,19 +13,22 @@ import {
   User,
   X,
   Save,
-  Loader2
+  Loader2,
+  Upload
 } from 'lucide-react'
 import { useStoryStore } from '../../store/useStoryStore'
 import { useReactFlow } from 'reactflow'
 import { nanoid } from 'nanoid'
 
 export default function LeftToolbox() {
-  const { addNode, characterAssets, currentLayer, setLayer, saveCharacterAsset } = useStoryStore()
+  const { addNode, characterAssets, currentLayer, setLayer, saveCharacterAsset, uploadImage } = useStoryStore()
   const { project } = useReactFlow()
   
   const [showCharModal, setShowCharModal] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [charForm, setCharData] = useState({ name: '', image: '', role: '', personality: '' })
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleCreateChar = async () => {
     if (!charForm.name || !charForm.image) return
@@ -37,6 +40,21 @@ export default function LeftToolbox() {
     setIsCreating(false)
     setShowCharModal(false)
     setCharData({ name: '', image: '', role: '', personality: '' })
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploading(true)
+    try {
+      const url = await uploadImage(file)
+      setCharData({ ...charForm, image: url })
+    } catch (error) {
+      alert('Upload failed. Please try again.')
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const handleAddNode = (type: string) => {
@@ -231,14 +249,30 @@ export default function LeftToolbox() {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase mb-2 block">Image URL</label>
-                <input 
-                  type="text"
-                  value={charForm.image}
-                  onChange={(e) => setCharData({ ...charForm, image: e.target.value })}
-                  placeholder="Paste direct image link..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-red-500/50 transition-colors"
-                />
+                <label className="text-[10px] font-bold text-zinc-500 uppercase mb-2 block">Character Image</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text"
+                    value={charForm.image}
+                    onChange={(e) => setCharData({ ...charForm, image: e.target.value })}
+                    placeholder="Paste URL or upload..."
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-red-500/50 transition-colors"
+                  />
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden" 
+                    accept="image/*"
+                  />
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+                  >
+                    {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

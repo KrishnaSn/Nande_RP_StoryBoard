@@ -85,8 +85,12 @@ function FlowEditor() {
   )
 
   // Keyboard Shortcuts
-  useKeypress(['Delete', 'Backspace'], () => {
-    if (selectedNode) {
+  useKeypress(['Delete', 'Backspace'], (event: any) => {
+    // Prevent deletion if the user is typing in an input or textarea
+    const activeElement = document.activeElement
+    const isTyping = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA'
+
+    if (selectedNode && !isTyping) {
       deleteNode(selectedNode.id)
     }
   })
@@ -175,7 +179,7 @@ export default function StoryEditor() {
             <div className="absolute bottom-36 right-6 z-30 pointer-events-none">
                <div className="bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Build 1.0.0 Stable</span>
+                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Build 1.1.0 Stable</span>
                </div>
             </div>
           </main>

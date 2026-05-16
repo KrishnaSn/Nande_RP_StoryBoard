@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 from app.database import engine, Base
 from app.routes.story import router as story_router
 from app.models.story import EpisodeModel, CharacterAssetModel
@@ -8,6 +10,13 @@ from app.models.story import EpisodeModel, CharacterAssetModel
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Nande RP StoryBoard API")
+
+# Ensure uploads directory exists
+UPLOAD_DIR = "uploads"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,

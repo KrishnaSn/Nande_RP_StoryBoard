@@ -1,11 +1,25 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException
+import os
+import shutil
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.story import EpisodeModel, CharacterAssetModel
 from app.schemas.story import Episode, EpisodeCreate, EpisodeUpdate, CharacterAsset
 
 router = APIRouter()
+
+@router.post("/upload")
+async def upload_image(file: UploadFile = File(...)):
+    upload_dir = "uploads"
+    if not os.path.exists(upload_dir):
+        os.makedirs(upload_dir)
+    
+    file_path = os.path.join(upload_dir, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    return {"url": f"http://localhost:8000/uploads/{file.filename}"}
 
 @router.get("/episodes", response_model=list[Episode])
 def get_episodes(db: Session = Depends(get_db)):
@@ -52,7 +66,13 @@ def get_characters(db: Session = Depends(get_db)):
 
 @router.post("/characters", response_model=CharacterAsset)
 def create_character(char: CharacterAsset, db: Session = Depends(get_db)):
-    db_char = CharacterAssetModel(id=char.id, name=char.name, image=char.image)
+    db_char = CharacterAssetModel(
+        id=char.id, 
+        name=char.name, 
+        image=char.image,
+        role=char.role,
+        personality=char.personality
+    )
     db.add(db_char)
     db.commit()
     db.refresh(db_char)

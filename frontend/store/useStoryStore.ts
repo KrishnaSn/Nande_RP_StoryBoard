@@ -72,6 +72,7 @@ interface StoryState {
   // Character Asset Actions
   addCharacterAsset: (asset: CharacterAsset) => void
   saveCharacterAsset: (asset: CharacterAsset) => Promise<void>
+  uploadImage: (file: File) => Promise<string>
   loadCharacters: () => Promise<void>
 
   // Layer Actions
@@ -83,7 +84,8 @@ interface StoryState {
 }
 
 const initialEpisodeId = 'ep-1'
-const API_URL = 'http://localhost:8000/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8000'
 
 export const useStoryStore = create<StoryState>()(
   temporal((set, get) => ({
@@ -119,6 +121,27 @@ export const useStoryStore = create<StoryState>()(
         }
       } catch (error) {
         console.error('Failed to save character:', error)
+      }
+    },
+
+    uploadImage: async (file: File) => {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        
+        const res = await fetch(`${API_URL}/upload`, {
+          method: 'POST',
+          body: formData
+        })
+        
+        if (res.ok) {
+          const data = await res.json()
+          return data.url
+        }
+        throw new Error('Upload failed')
+      } catch (error) {
+        console.error('Failed to upload image:', error)
+        throw error
       }
     },
 

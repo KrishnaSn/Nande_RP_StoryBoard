@@ -157,6 +157,16 @@ export default function RightInspector() {
                       className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs text-zinc-300 focus:outline-none focus:border-red-500/50"
                     />
                   </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase mb-1.5 block">
+                      Personality
+                    </label>
+                    <textarea 
+                      value={selectedNode.data.personality}
+                      onChange={(e) => handleDataChange('personality', e.target.value)}
+                      className="w-full h-24 bg-white/5 border border-white/5 rounded-lg p-2 text-xs text-zinc-300 focus:outline-none focus:border-red-500/50"
+                    />
+                  </div>
                 </>
               )}
 
