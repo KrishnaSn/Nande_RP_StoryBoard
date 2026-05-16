@@ -3,7 +3,7 @@
 import { Handle, Position } from 'reactflow'
 import { User, Settings } from 'lucide-react'
 
-export default function CharacterSceneNode({ data, selected }: any) {
+export default function CharacterSceneNode({ id, data, selected }: any) {
   const charColor = data.color || '#ef4444'
 
   return (
@@ -39,7 +39,7 @@ export default function CharacterSceneNode({ data, selected }: any) {
           onClick={(e) => {
             e.stopPropagation()
             // Dispatch custom event to open modal
-            window.dispatchEvent(new CustomEvent('open-scene-modal', { detail: { nodeId: data.id || '' } }))
+            window.dispatchEvent(new CustomEvent('open-scene-modal', { detail: { nodeId: id } }))
           }}
         >
           <Settings size={12} />

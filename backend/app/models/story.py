@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String, Text
+from sqlalchemy import Column, String, Text, DateTime
 from app.database import Base
+import datetime
 
 class ArcModel(Base):
     __tablename__ = "arcs"
@@ -9,3 +10,5 @@ class ArcModel(Base):
     description = Column(String)
     nodes = Column(Text, default="[]")
     edges = Column(Text, default="[]")
+    locked_by = Column(String, nullable=True)
+    locked_at = Column(DateTime, nullable=True)
