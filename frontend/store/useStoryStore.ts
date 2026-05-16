@@ -90,9 +90,9 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8000'
 
 export const useStoryStore = create<StoryState>()(
   temporal((set, get) => ({
-    episodes: [{ id: 'ep-1', title: 'The Prologue', description: 'The beginning.' }],
-    currentEpisodeId: 'ep-1',
-    episodeGraphs: { 'ep-1': { nodes: [], edges: [] } },
+    episodes: [],
+    currentEpisodeId: '',
+    episodeGraphs: {},
     characterAssets: [],
     selectedNode: null,
     currentLayer: 'Story Graph',
@@ -188,40 +188,45 @@ export const useStoryStore = create<StoryState>()(
               episodes: loadedEpisodes, 
               episodeGraphs: loadedGraphs,
               // Keep current ID unless it was deleted by someone else
-              currentEpisodeId: loadedEpisodes.some((e: Episode) => e.id === currentState.currentEpisodeId) 
+              currentEpisodeId: currentState.currentEpisodeId && loadedEpisodes.some((e: Episode) => e.id === currentState.currentEpisodeId) 
                 ? currentState.currentEpisodeId 
                 : loadedEpisodes[0].id
             })
-            console.log('🔄 StoryBoard: Syncing latest changes from other users.')
+            console.log('🔄 StoryBoard: Syncing latest changes...')
           }
         } else {
-          // If no episodes, create a default one and SAVE it immediately
-          const defaultId = `ep-${nanoid(5)}`
-          const defaultEp = { id: defaultId, title: 'The Prologue', description: 'The beginning of your story.' }
-          
-          set({
-            episodes: [defaultEp],
-            episodeGraphs: { [defaultId]: { nodes: [], edges: [] } },
-            currentEpisodeId: defaultId
-          })
-          
-          // Auto-save the new default episode to backend
-          fetch(`${API_URL}/episodes`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(defaultEp)
-          }).catch(err => console.error('Failed to auto-save default episode:', err))
+          // CRITICAL: We only create the default episode if BOTH backend is empty 
+          // AND we don't have any episodes in our current session.
+          // This prevents "The Prologue" from reappearing every 5 seconds after deletion.
+          const currentState = get()
+          if (currentState.episodes.length === 0) {
+            const defaultId = `ep-initial`
+            const defaultEp = { id: defaultId, title: 'The Prologue', description: 'The beginning of your story.' }
+            
+            set({
+              episodes: [defaultEp],
+              episodeGraphs: { [defaultId]: { nodes: [], edges: [] } },
+              currentEpisodeId: defaultId
+            })
+            
+            // Auto-save the new default episode to backend
+            fetch(`${API_URL}/episodes`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(defaultEp)
+            }).catch(err => console.error('Failed to auto-save default episode:', err))
 
-          console.log('ℹ️ StoryBoard: No episodes found, initialized and saved default.')
+            console.log('ℹ️ StoryBoard: Initialized default workspace.')
+          }
         }
       } catch (error) {
-        console.error('❌ StoryBoard: Failed to load from backend. Falling back to offline mode.', error)
+        console.error('❌ StoryBoard: Failed to load from backend.', error)
         
-        // CRITICAL FIX: Ensure we have at least one episode to enable node creation
+        // Ensure we have at least one episode for offline use if none exist
         if (get().episodes.length === 0) {
           const defaultId = 'ep-offline'
           set({
-            episodes: [{ id: defaultId, title: 'Offline Workspace', description: 'Backend unreachable. Nodes can still be added but will not persist.' }],
+            episodes: [{ id: defaultId, title: 'Local Workspace', description: 'Backend unreachable. Nodes can still be added.' }],
             episodeGraphs: { [defaultId]: { nodes: [], edges: [] } },
             currentEpisodeId: defaultId
           })
@@ -260,10 +265,11 @@ export const useStoryStore = create<StoryState>()(
       }
     },
 // ... (getNodes and other methods)
-    deleteEpisode: (id: string) => {
+    deleteEpisode: async (id: string) => {
       const { episodes, currentEpisodeId, episodeGraphs } = get()
-      const newEpisodes = episodes.filter(ep => ep.id !== id)
       
+      // OPTIMISTIC UPDATE: Remove immediately from UI
+      const newEpisodes = episodes.filter(ep => ep.id !== id)
       const newGraphs = { ...episodeGraphs }
       delete newGraphs[id]
 
@@ -278,8 +284,16 @@ export const useStoryStore = create<StoryState>()(
         currentEpisodeId: newCurrentId 
       })
       
-      // Note: Ideally we should call the backend to delete as well
-      fetch(`${API_URL}/episodes/${id}`, { method: 'DELETE' }).catch(console.error)
+      console.log(`🗑️ StoryBoard: Optimistically deleted episode ${id}.`)
+
+      // Sync with backend
+      try {
+        const res = await fetch(`${API_URL}/episodes/${id}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error('Failed to delete on backend')
+        console.log('✅ StoryBoard: Episode deletion synced with backend.')
+      } catch (error) {
+        console.error('❌ StoryBoard: Failed to delete episode on backend:', error)
+      }
     },
 
     getNodes: () => {

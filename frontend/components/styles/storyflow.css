@@ -186,9 +186,11 @@
 }
 
 .node-container {
-  transition: transform 0.1s ease-out;
+  /* Removed transform transition to prevent React Flow jitter during drag/connect */
+  user-select: none;
 }
 
 .node-container:active {
-  transform: scale(0.98);
+  /* Subtle border highlight instead of scale to maintain coordinate accuracy */
+  border-color: rgba(239, 68, 68, 0.4);
 }
