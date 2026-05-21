@@ -20,9 +20,9 @@ export default function TopBar() {
   }
 
   return (
-    <header className={`h-14 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between px-6 z-20 relative transition-all duration-500 ${isPresenting ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'}`}>
-      <div className="ui-tag">[GLOBAL_TOP_NAV]</div>
-      <div className="flex items-center gap-4">
+    <header className={`h-16 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between px-6 z-20 relative transition-all duration-500 ${isPresenting ? '-translate-y-full opacity-0 invisible' : 'translate-y-0 opacity-100 visible'}`}>
+      <div className="flex items-center gap-6">
+
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 shadow-lg shadow-red-500/10">
             <img src="/logo.jpg" alt="Nande RP Logo" className="w-full h-full object-cover" />

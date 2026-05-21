@@ -10,9 +10,10 @@ export default function LeftToolbox() {
   
   const characters = [
     { name: 'RedParasite', color: '#ef4444' },
-    { name: 'Chitty', color: '#3b82f6' },
+    { name: 'AJ', color: '#3b82f6' },
+    { name: 'Chitty', color: '#60a5fa' },
     { name: 'Sanju', color: '#10b981' },
-    { name: 'PR Hashtag', color: '#f59e0b' },
+    { name: 'PR Hashtag', color: '#facc15' },
     { name: 'Obito', color: '#8b5cf6' },
     { name: 'Gabbar Singh', color: '#f97316' },
     { name: 'Krishna', color: '#06b6d4' },
@@ -37,14 +38,13 @@ export default function LeftToolbox() {
     })
     addNode('choice', center, { 
       character: 'System', 
-      color: '#ffffff',
+      color: '#ec4899',
       title: 'Decision Point' 
     })
   }
 
   return (
     <aside className={`w-64 border-r border-white/5 bg-[#0d0d0d] flex flex-col z-20 relative transition-all duration-500 ${isPresenting ? '-translate-x-full opacity-0 invisible' : 'translate-x-0 opacity-100 visible'}`}>
-      <div className="ui-tag">[ASSET_TOOLBOX]</div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-8 scrollbar-hide">
         {/* Node Creation Section */}
@@ -82,9 +82,9 @@ export default function LeftToolbox() {
             <div className="pt-4 border-t border-white/5">
                <button
                   onClick={handleAddChoiceNode}
-                  className="w-full group flex items-center gap-3 p-3 rounded-xl border border-white/5 bg-white/5 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all"
+                  className="w-full group flex items-center gap-3 p-3 rounded-xl border border-white/5 bg-white/5 hover:border-pink-500/50 hover:bg-pink-500/5 transition-all"
                 >
-                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
+                  <div className="p-2 rounded-lg bg-pink-500/10 text-pink-500">
                     <GitBranch size={18} />
                   </div>
                   <div className="text-left">
