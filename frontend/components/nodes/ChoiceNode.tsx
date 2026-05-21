@@ -4,12 +4,12 @@ import { Handle, Position } from 'reactflow'
 import { GitBranch, Settings } from 'lucide-react'
 
 export default function ChoiceNode({ id, data, selected }: any) {
-  const accentColor = '#ffffff' // White for System/Decision nodes
+  const accentColor = '#ec4899' // Pink for Decision nodes
 
   return (
     <div 
       className={`node-container w-64 overflow-hidden rounded-xl border transition-all duration-300 ${
-        selected ? 'shadow-[0_0_25px_-5px_rgba(255,255,255,0.2)]' : 'border-white/5'
+        selected ? 'shadow-[0_0_25px_-5px_rgba(236,72,153,0.3)]' : 'border-white/5'
       } bg-[#0d0d0d] shadow-2xl`}
       style={{ 
         borderColor: selected ? accentColor : 'rgba(255,255,255,0.05)',
@@ -26,7 +26,7 @@ export default function ChoiceNode({ id, data, selected }: any) {
         className="px-3 py-2 flex items-center justify-between border-b border-white/5 bg-white/5"
       >
         <div className="flex items-center gap-2">
-          <div className="p-1 rounded-md bg-white/10 text-white">
+          <div className="p-1 rounded-md bg-pink-500/10 text-pink-500">
             <GitBranch size={12} />
           </div>
           <span className="text-[9px] font-black text-white uppercase tracking-widest">Decision Point</span>

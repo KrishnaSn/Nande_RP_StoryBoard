@@ -401,7 +401,7 @@ export const useStoryStore = create<StoryState>()(
         position: position || { x: 100, y: 100 },
         data: { 
           character: initialData?.character || 'System',
-          color: initialData?.color || '#ffffff',
+          color: initialData?.color || (type === 'choice' ? '#ec4899' : '#ffffff'),
           title: type === 'choice' ? 'Decision Point' : 'New Scene',
           description: '',
           options: type === 'choice' ? ['Option A', 'Option B'] : undefined,
