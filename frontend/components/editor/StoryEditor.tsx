@@ -21,7 +21,6 @@ import ArcTimeline from '../timeline/ArcTimeline'
 import SceneModal from './SceneModal'
 import ContextMenu from './ContextMenu'
 import SaveSyncModal from './SaveSyncModal'
-import LockedOverlay from './LockedOverlay'
 import DeviceGuard from './DeviceGuard'
 
 const nodeTypes = {
@@ -45,34 +44,20 @@ function FlowEditor() {
     deleteNode,
     isPresenting,
     togglePresentMode,
-    currentArcId,
-    acquireLock,
-    lockedBy,
-    userId
+    currentArcId
   } = useStoryStore()
 
   const nodes = getNodes()
   const edges = getEdges()
 
-  // LOCKING LOGIC: Attempt to lock when user interacts
-  const handleInteraction = useCallback(async () => {
-    if (currentArcId && (!lockedBy || lockedBy !== userId)) {
-      await acquireLock(currentArcId)
-    }
-  }, [currentArcId, lockedBy, userId, acquireLock])
-
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // If locked by someone else, block all hotkeys
-      if (lockedBy && lockedBy !== userId) return
-
       // DELETE Key (Only Delete, not Backspace)
       if (e.key === 'Delete') {
         const selectedNodes = nodes.filter(n => n.selected)
         if (selectedNodes.length > 0 && !['INPUT', 'TEXTAREA'].includes((document.activeElement as any).tagName)) {
            if (confirm(`Delete ${selectedNodes.length} node(s)?`)) {
-             handleInteraction()
              selectedNodes.forEach(n => deleteNode(n.id))
            }
         }
@@ -81,7 +66,6 @@ function FlowEditor() {
       // UNDO (Ctrl+Z)
       if (e.ctrlKey && e.key === 'z') {
         e.preventDefault()
-        handleInteraction()
         const { undo } = (useStoryStore as any).temporal.getState()
         undo()
       }
@@ -94,26 +78,18 @@ function FlowEditor() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [nodes, deleteNode, lockedBy, userId, handleInteraction, isPresenting, togglePresentMode])
+  }, [nodes, deleteNode, isPresenting, togglePresentMode])
 
-  // Initial load, Polling for Locks/Sync, and Heartbeat
+  // Initial load and Sync Polling
   useEffect(() => {
     loadArcs()
     
     const interval = setInterval(() => {
-      // HEARTBEAT: If WE hold the lock, refresh it every 30s to keep it alive
-      if (lockedBy === userId && currentArcId) {
-        acquireLock(currentArcId)
-      }
-      
-      // SYNC: Only refresh from cloud if we DON'T hold the lock
-      if (!lockedBy || lockedBy !== userId) {
-        loadArcs()
-      }
+      loadArcs()
     }, 8000)
 
     return () => clearInterval(interval)
-  }, [loadArcs, lockedBy, userId, currentArcId, acquireLock])
+  }, [loadArcs])
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
@@ -123,9 +99,6 @@ function FlowEditor() {
   const onDrop = useCallback(
     async (event: React.DragEvent) => {
       event.preventDefault()
-      if (lockedBy && lockedBy !== userId) return
-      
-      await handleInteraction()
 
       const type = event.dataTransfer.getData('application/reactflow')
       if (typeof type === 'undefined' || !type) return
@@ -140,7 +113,7 @@ function FlowEditor() {
       
       addNode(type, position, initialData)
     },
-    [addNode, lockedBy, userId, handleInteraction]
+    [addNode]
   )
 
   const onNodeContextMenu = useCallback(
@@ -197,9 +170,9 @@ function FlowEditor() {
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={(c) => { if(!lockedBy || lockedBy === userId) { handleInteraction(); onNodesChange(c); } }}
-            onEdgesChange={(c) => { if(!lockedBy || lockedBy === userId) { handleInteraction(); onEdgesChange(c); } }}
-            onConnect={(c) => { if(!lockedBy || lockedBy === userId) { handleInteraction(); onConnect(c); } }}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
             onNodeClick={(_, node) => setSelectedNode(node)}
             onPaneClick={onPaneClick}
             onNodeContextMenu={onNodeContextMenu}
@@ -236,7 +209,7 @@ function FlowEditor() {
             <Panel position="bottom-right" className="m-8">
                <div className={`px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-md flex items-center gap-2 shadow-2xl transition-all duration-500 ${isPresenting ? 'opacity-0 translate-y-10' : 'opacity-100 translate-y-0'}`}>
                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                 <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Build 2.2.0 Locked-Sync</span>
+                 <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Build 2.2.1 Multi-User</span>
                </div>
             </Panel>
 
@@ -255,7 +228,6 @@ function FlowEditor() {
             {menu && <ContextMenu onClick={onPaneClick} {...menu} />}
           </ReactFlow>
           
-          <LockedOverlay />
         </main>
       </div>
 

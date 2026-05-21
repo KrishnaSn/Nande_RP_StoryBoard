@@ -22,8 +22,6 @@ export interface Arc {
   id: string
   title: string
   description: string
-  locked_by?: string
-  locked_at?: string
 }
 
 interface ArcData {
@@ -40,7 +38,6 @@ interface StoryState {
   hasInitialized: boolean
   isPresenting: boolean
   userId: string
-  lockedBy: string | null
   lastLocalEdit: number // REQUIRED FOR SYNC GUARD
   
   // Computed (getters)
@@ -72,8 +69,6 @@ interface StoryState {
   // Backend Synchronization (MANUAL ONLY)
   loadArcs: () => Promise<void>
   saveCurrentArc: () => Promise<void>
-  acquireLock: (arcId: string) => Promise<boolean>
-  releaseLock: (arcId: string) => Promise<void>
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
@@ -98,7 +93,6 @@ export const useStoryStore = create<StoryState>()(
     hasInitialized: false,
     isPresenting: false,
     userId: getUserId(),
-    lockedBy: null,
     lastLocalEdit: 0,
 
     loadArcs: async () => {
@@ -117,15 +111,12 @@ export const useStoryStore = create<StoryState>()(
             return { 
               id: ep.id, 
               title: ep.title, 
-              description: ep.description,
-              locked_by: ep.locked_by,
-              locked_at: ep.locked_at
+              description: ep.description
             }
           })
 
           const state = get()
           const currentId = state.currentArcId || loadedArcs[0].id
-          const activeArc = loadedArcs.find((a: Arc) => a.id === currentId)
           
           // SYNC LOGIC: 
           // We always update the list of Arcs.
@@ -146,8 +137,7 @@ export const useStoryStore = create<StoryState>()(
             arcs: loadedArcs, 
             arcGraphs: mergedGraphs,
             hasInitialized: true,
-            currentArcId: currentId,
-            lockedBy: activeArc?.locked_by || null
+            currentArcId: currentId
           })
           console.log('📦 StoryBoard: Arcs synced.')
         } else if (!get().hasInitialized) {
@@ -168,40 +158,6 @@ export const useStoryStore = create<StoryState>()(
       } catch (error) {
         console.error('❌ StoryBoard: Cloud sync failed.', error)
       }
-    },
-
-    acquireLock: async (arcId: string) => {
-       try {
-         const res = await fetch(`${API_URL}/arcs/${arcId}/lock`, {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ user_id: get().userId })
-         })
-         const data = await res.json()
-         if (data.status === 'acquired') {
-           set({ lockedBy: get().userId })
-           return true
-         } else {
-           set({ lockedBy: data.locked_by })
-           return false
-         }
-       } catch (error) {
-         console.error('Lock acquisition failed:', error)
-         return false
-       }
-    },
-
-    releaseLock: async (arcId: string) => {
-       try {
-         await fetch(`${API_URL}/arcs/${arcId}/unlock`, {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ user_id: get().userId })
-         })
-         set({ lockedBy: null })
-       } catch (error) {
-         console.error('Lock release failed:', error)
-       }
     },
 
     saveCurrentArc: async () => {
@@ -255,9 +211,6 @@ export const useStoryStore = create<StoryState>()(
           set({ lastLocalEdit: 0 })
           get().loadArcs()
           window.dispatchEvent(new CustomEvent('arc-sync-complete'))
-        } else if (updateRes.status === 423) {
-           alert("Sync Locked: Another contributor is editing this Arc.")
-           get().loadArcs()
         }
       } catch (error) {
         console.error('❌ StoryBoard: Publish failed.', error)
@@ -302,8 +255,7 @@ export const useStoryStore = create<StoryState>()(
     },
 
     setCurrentArc: (id: string) => {
-      const arc = get().arcs.find(a => a.id === id)
-      set({ currentArcId: id, selectedNode: null, lockedBy: arc?.locked_by || null, lastLocalEdit: 0 })
+      set({ currentArcId: id, selectedNode: null, lastLocalEdit: 0 })
     },
 
     togglePresentMode: () => {

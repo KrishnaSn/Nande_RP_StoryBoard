@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.story import ArcModel
-from app.schemas.story import Arc, ArcCreate, ArcUpdate, LockRequest
+from app.schemas.story import Arc, ArcCreate, ArcUpdate
 from datetime import datetime
 from typing import Optional
 
@@ -30,9 +30,7 @@ def create_arc(arc: ArcCreate, db: Session = Depends(get_db)):
         title=arc.title, 
         description=arc.description, 
         nodes="[]", 
-        edges="[]",
-        locked_by=None,
-        locked_at=None
+        edges="[]"
     )
     db.add(db_arc)
     db.commit()
@@ -47,10 +45,6 @@ def update_arc(arc_id: str, arc_update: ArcUpdate, user_id: Optional[str] = None
     if not db_arc:
         raise HTTPException(status_code=404, detail="Arc not found")
     
-    # Simple Lock Check
-    if db_arc.locked_by and user_id != db_arc.locked_by:
-        raise HTTPException(status_code=423, detail=f"Arc is locked by another user: {db_arc.locked_by}")
-
     # Update metadata
     if arc_update.title is not None:
         db_arc.title = arc_update.title
@@ -63,11 +57,6 @@ def update_arc(arc_id: str, arc_update: ArcUpdate, user_id: Optional[str] = None
     if arc_update.edges is not None:
         db_arc.edges = json.dumps(arc_update.edges)
     
-    # Auto-unlock on save if user_id matches the lock owner
-    if user_id and db_arc.locked_by == user_id:
-        db_arc.locked_by = None
-        db_arc.locked_at = None
-
     db.commit()
     db.refresh(db_arc)
     
@@ -75,40 +64,6 @@ def update_arc(arc_id: str, arc_update: ArcUpdate, user_id: Optional[str] = None
     db_arc.nodes = json.loads(db_arc.nodes) if isinstance(db_arc.nodes, str) else db_arc.nodes
     db_arc.edges = json.loads(db_arc.edges) if isinstance(db_arc.edges, str) else db_arc.edges
     return db_arc
-
-@router.post("/arcs/{arc_id}/lock")
-def lock_arc(arc_id: str, req: LockRequest, db: Session = Depends(get_db)):
-    db_arc = db.query(ArcModel).filter(ArcModel.id == arc_id).first()
-    if not db_arc:
-        raise HTTPException(status_code=404, detail="Arc not found")
-    
-    # Lock expires if no heartbeat for 60 seconds
-    is_expired = False
-    if db_arc.locked_at:
-        delta = datetime.utcnow() - db_arc.locked_at
-        if delta.total_seconds() > 60:
-            is_expired = True
-
-    if db_arc.locked_by and db_arc.locked_by != req.user_id and not is_expired:
-        return {"status": "denied", "locked_by": db_arc.locked_by}
-    
-    db_arc.locked_by = req.user_id
-    db_arc.locked_at = datetime.utcnow()
-    db.commit()
-    return {"status": "acquired"}
-
-@router.post("/arcs/{arc_id}/unlock")
-def unlock_arc(arc_id: str, req: LockRequest, db: Session = Depends(get_db)):
-    db_arc = db.query(ArcModel).filter(ArcModel.id == arc_id).first()
-    if not db_arc:
-        raise HTTPException(status_code=404, detail="Arc not found")
-    
-    if db_arc.locked_by == req.user_id:
-        db_arc.locked_by = None
-        db_arc.locked_at = None
-        db.commit()
-    
-    return {"status": "released"}
 
 @router.delete("/arcs/{arc_id}")
 def delete_arc(arc_id: str, db: Session = Depends(get_db)):
