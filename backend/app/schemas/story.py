@@ -19,9 +19,4 @@ class Arc(ArcBase):
     id: str
     nodes: Any
     edges: Any
-    locked_by: Optional[str] = None
-    locked_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
-
-class LockRequest(BaseModel):
-    user_id: str

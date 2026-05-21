@@ -10,5 +10,3 @@ class ArcModel(Base):
     description = Column(String)
     nodes = Column(Text, default="[]")
     edges = Column(Text, default="[]")
-    locked_by = Column(String, nullable=True)
-    locked_at = Column(DateTime, nullable=True)
