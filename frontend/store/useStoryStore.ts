@@ -39,6 +39,7 @@ interface StoryState {
   isPresenting: boolean
   userId: string
   lastLocalEdit: number // REQUIRED FOR SYNC GUARD
+  isSyncing: boolean // NEW: Prevent overlapping syncs
   
   // Computed (getters)
   getNodes: () => StoryNode[]
@@ -67,7 +68,7 @@ interface StoryState {
   togglePresentMode: () => void
 
   // Backend Synchronization (MANUAL ONLY)
-  loadArcs: () => Promise<void>
+  loadArcs: (force?: boolean) => Promise<void>
   saveCurrentArc: () => Promise<void>
 }
 
@@ -94,9 +95,14 @@ export const useStoryStore = create<StoryState>()(
     isPresenting: false,
     userId: getUserId(),
     lastLocalEdit: 0,
+    isSyncing: false,
 
-    loadArcs: async () => {
+    loadArcs: async (force = false) => {
+      const state = get()
+      if (state.isSyncing && !force) return
+      
       try {
+        set({ isSyncing: true })
         const res = await fetch(`${API_URL}/arcs`)
         if (!res.ok) throw new Error(`Backend fetch failed with status: ${res.status}`)
         const data = await res.json()
@@ -115,21 +121,24 @@ export const useStoryStore = create<StoryState>()(
             }
           })
 
-          const state = get()
-          const currentId = state.currentArcId || loadedArcs[0].id
+          const currentState = get()
+          const currentId = currentState.currentArcId || loadedArcs[0].id
           
           // SYNC LOGIC: 
-          // We always update the list of Arcs.
           // We update the graph data ONLY IF:
           // 1. It's not the current Arc
-          // 2. It IS the current Arc BUT we haven't edited it locally in the last 10 seconds
+          // 2. It IS the current Arc BUT we haven't edited it locally in the last 15 seconds
           const now = Date.now()
-          const isIdle = (now - state.lastLocalEdit) > 10000
+          const isIdle = (now - currentState.lastLocalEdit) > 15000
           
-          const mergedGraphs = { ...state.arcGraphs }
+          const mergedGraphs = { ...currentState.arcGraphs }
           loadedArcs.forEach((arc: Arc) => {
-            if (arc.id !== currentId || isIdle || !state.arcGraphs[arc.id]) {
-              mergedGraphs[arc.id] = loadedGraphs[arc.id]
+            // Never overwrite if we have unsaved local edits
+            if (arc.id !== currentId || (isIdle && currentState.lastLocalEdit === 0)) {
+               mergedGraphs[arc.id] = loadedGraphs[arc.id]
+            } else if (!mergedGraphs[arc.id]) {
+               // Initial load of the current arc
+               mergedGraphs[arc.id] = loadedGraphs[arc.id]
             }
           })
 
@@ -137,7 +146,8 @@ export const useStoryStore = create<StoryState>()(
             arcs: loadedArcs, 
             arcGraphs: mergedGraphs,
             hasInitialized: true,
-            currentArcId: currentId
+            currentArcId: currentId,
+            isSyncing: false
           })
           console.log('📦 StoryBoard: Arcs synced.')
         } else if (!get().hasInitialized) {
@@ -147,16 +157,20 @@ export const useStoryStore = create<StoryState>()(
             arcs: [defaultArc],
             arcGraphs: { [defaultId]: { nodes: [], edges: [] } },
             currentArcId: defaultId,
-            hasInitialized: true
+            hasInitialized: true,
+            isSyncing: false
           })
-          fetch(`${API_URL}/arcs`, {
+          await fetch(`${API_URL}/arcs`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(defaultArc)
           })
+        } else {
+          set({ isSyncing: false })
         }
       } catch (error) {
         console.error('❌ StoryBoard: Cloud sync failed.', error)
+        set({ isSyncing: false })
       }
     },
 
@@ -165,9 +179,12 @@ export const useStoryStore = create<StoryState>()(
       const currentArc = state.arcs.find(arc => arc.id === state.currentArcId)
       const graph = state.arcGraphs[state.currentArcId]
       
-      if (!currentArc || !graph) return
+      if (!currentArc || !graph || state.isSyncing) return
+
+      const startTime = state.lastLocalEdit
 
       try {
+        set({ isSyncing: true })
         console.log(`📡 StoryBoard: Publishing Arc "${currentArc.title}"...`)
         
         const optimizedNodes = graph.nodes.map(n => ({
@@ -207,29 +224,67 @@ export const useStoryStore = create<StoryState>()(
         }
 
         if (updateRes.ok) {
+          const updatedArc = await updateRes.json()
           console.log('✅ StoryBoard: Publish complete.')
-          set({ lastLocalEdit: 0 })
-          get().loadArcs()
+          
+          // Update local state with server data to ensure consistency
+          const updatedGraphs = { ...get().arcGraphs }
+          updatedGraphs[currentArc.id] = {
+            nodes: typeof updatedArc.nodes === 'string' ? JSON.parse(updatedArc.nodes) : (updatedArc.nodes || []),
+            edges: typeof updatedArc.edges === 'string' ? JSON.parse(updatedArc.edges) : (updatedArc.edges || [])
+          }
+
+          const updatedArcs = get().arcs.map(a => a.id === updatedArc.id ? { 
+            id: updatedArc.id, 
+            title: updatedArc.title, 
+            description: updatedArc.description 
+          } : a)
+
+          set((s) => ({ 
+            lastLocalEdit: s.lastLocalEdit === startTime ? 0 : s.lastLocalEdit, 
+            isSyncing: false,
+            arcGraphs: updatedGraphs,
+            arcs: updatedArcs
+          }))
+          
           window.dispatchEvent(new CustomEvent('arc-sync-complete'))
+        } else {
+          set({ isSyncing: false })
         }
       } catch (error) {
         console.error('❌ StoryBoard: Publish failed.', error)
+        set({ isSyncing: false })
       }
     },
 
     addArc: async (id: string, title: string, description: string) => {
+      const startTime = Date.now()
       const newArc = { id, title, description }
+      
+      // Update local state first for immediate feedback
       set({ 
         arcs: [...get().arcs, newArc],
         arcGraphs: { ...get().arcGraphs, [id]: { nodes: [], edges: [] } },
         currentArcId: id,
-        lastLocalEdit: Date.now()
+        lastLocalEdit: startTime
       })
-      fetch(`${API_URL}/arcs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newArc)
-      }).catch(console.error)
+
+      try {
+        const res = await fetch(`${API_URL}/arcs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newArc)
+        })
+        if (res.ok) {
+           // Only reset if no newer edits happened
+           set((s) => ({
+             lastLocalEdit: s.lastLocalEdit === startTime ? 0 : s.lastLocalEdit
+           }))
+           await get().loadArcs(true)
+        }
+      } catch (error) {
+        console.error('Failed to create arc on server:', error)
+      }
     },
 
     updateArc: (id: string, data: Partial<Arc>) => {
