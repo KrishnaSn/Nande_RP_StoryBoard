@@ -72,4 +72,40 @@ describe('StoryStore (Arc Edition)', () => {
     expect(state.arcs.length).toBe(1)
     expect(state.arcGraphs['arc-delete']).toBeUndefined()
   })
+
+  it('should add and retrieve custom characters', () => {
+    const { addCustomCharacter, getCharacters } = useStoryStore.getState()
+    const initialCount = getCharacters().length
+
+    addCustomCharacter('Tommy Vercetti', '#8b5cf6')
+    const updatedChars = useStoryStore.getState().getCharacters()
+    expect(updatedChars.length).toBe(initialCount + 1)
+    expect(updatedChars.some(c => c.name === 'Tommy Vercetti' && c.color === '#8b5cf6')).toBe(true)
+
+    // Should not allow duplicate names
+    addCustomCharacter('Tommy Vercetti', '#ef4444')
+    expect(useStoryStore.getState().getCharacters().length).toBe(initialCount + 1)
+  })
+
+  it('should remove a custom character', () => {
+    const { addCustomCharacter, removeCustomCharacter, getCharacters } = useStoryStore.getState()
+    addCustomCharacter('Temporary Char', '#f59e0b')
+    expect(getCharacters().some(c => c.name === 'Temporary Char')).toBe(true)
+
+    removeCustomCharacter('Temporary Char')
+    expect(useStoryStore.getState().getCharacters().some(c => c.name === 'Temporary Char')).toBe(false)
+  })
+
+  it('should add a characterScene node for a custom character', () => {
+    const { addCustomCharacter, addNode, getNodes } = useStoryStore.getState()
+    addCustomCharacter('Arthur Morgan', '#f97316')
+    
+    addNode('characterScene', { x: 50, y: 50 }, { character: 'Arthur Morgan', color: '#f97316' })
+    const nodes = useStoryStore.getState().getNodes()
+    const customNode = nodes.find(n => n.data.character === 'Arthur Morgan')
+    
+    expect(customNode).toBeDefined()
+    expect(customNode?.data.color).toBe('#f97316')
+  })
 })
+

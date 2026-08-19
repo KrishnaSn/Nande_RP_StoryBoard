@@ -5,11 +5,13 @@ import { X, Trash2, Save, User, FileText, Layout, Plus, Minus, GitBranch } from 
 import { useStoryStore } from '../../store/useStoryStore'
 
 export default function SceneModal() {
-  const { arcGraphs, currentArcId, updateNodeData, deleteNode } = useStoryStore()
+  const { arcGraphs, currentArcId, updateNodeData, deleteNode, getCharacters } = useStoryStore()
   const [isOpen, setIsOpen] = useState(false)
   const [nodeId, setNodeId] = useState<string | null>(null)
   const [nodeType, setNodeType] = useState<string>('characterScene')
   const [editData, setEditData] = useState({ title: '', description: '', character: '', color: '', options: [] as string[] })
+
+  const characters = getCharacters()
 
   useEffect(() => {
     const handleOpen = (e: any) => {
@@ -35,11 +37,21 @@ export default function SceneModal() {
     return () => window.removeEventListener('open-scene-modal', handleOpen)
   }, [arcGraphs, currentArcId])
 
+  const handleSelectCharacter = (char: { name: string; color: string }) => {
+    setEditData(prev => ({
+      ...prev,
+      character: char.name,
+      color: char.color
+    }))
+  }
+
   const handleSave = () => {
     if (nodeId) {
       updateNodeData(nodeId, { 
         title: editData.title, 
         description: editData.description,
+        character: editData.character,
+        color: editData.color,
         options: nodeType === 'choice' ? editData.options : undefined
       })
       setIsOpen(false)
@@ -115,7 +127,7 @@ export default function SceneModal() {
               />
             </div>
 
-            {nodeType === 'choice' && (
+            {nodeType === 'choice' ? (
               <div className="flex-[1.5] space-y-3">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2 text-zinc-600">
@@ -147,6 +159,33 @@ export default function SceneModal() {
                         <Minus size={12} />
                       </button>
                     </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2 text-zinc-600 mb-1">
+                  <User size={12} />
+                  <label className="text-[8px] font-bold uppercase tracking-widest">Assign Character</label>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar p-1">
+                  {characters.map((c) => (
+                    <button
+                      key={c.name}
+                      type="button"
+                      onClick={() => handleSelectCharacter(c)}
+                      className={`px-2.5 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-tight flex items-center gap-1.5 transition-all ${
+                        editData.character === c.name
+                          ? 'bg-white/10 text-white shadow-md'
+                          : 'bg-white/5 border-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-white/10'
+                      }`}
+                      style={{
+                        borderColor: editData.character === c.name ? c.color : 'rgba(255,255,255,0.05)'
+                      }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.color }} />
+                      <span>{c.name}</span>
+                    </button>
                   ))}
                 </div>
               </div>

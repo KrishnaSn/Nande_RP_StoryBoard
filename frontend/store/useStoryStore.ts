@@ -18,6 +18,24 @@ import { nanoid } from 'nanoid'
 export type StoryNode = Node
 export type StoryEdge = Edge
 
+export interface Character {
+  id?: string
+  name: string
+  color: string
+  isDefault?: boolean
+}
+
+export const DEFAULT_CHARACTERS: Character[] = [
+  { name: 'RedParasite', color: '#ef4444', isDefault: true },
+  { name: 'Varadha', color: '#3b82f6', isDefault: true },
+  { name: 'Chitty', color: '#60a5fa', isDefault: true },
+  { name: 'Sanju', color: '#10b981', isDefault: true },
+  { name: 'PR Hashtag', color: '#facc15', isDefault: true },
+  { name: 'Obito', color: '#8b5cf6', isDefault: true },
+  { name: 'Gabbar Singh', color: '#f97316', isDefault: true },
+  { name: 'Krishna', color: '#06b6d4', isDefault: true },
+]
+
 export interface Arc {
   id: string
   title: string
@@ -40,10 +58,16 @@ interface StoryState {
   userId: string
   lastLocalEdit: number // REQUIRED FOR SYNC GUARD
   isSyncing: boolean // NEW: Prevent overlapping syncs
+  customCharacters: Character[]
   
   // Computed (getters)
   getNodes: () => StoryNode[]
   getEdges: () => StoryEdge[]
+  getCharacters: () => Character[]
+
+  // Character Actions
+  addCustomCharacter: (name: string, color: string) => void
+  removeCustomCharacter: (name: string) => void
 
   // Actions (LOCAL ONLY)
   onNodesChange: OnNodesChange
@@ -85,6 +109,16 @@ const getUserId = () => {
   return id
 }
 
+const getInitialCustomCharacters = (): Character[] => {
+  if (typeof window === 'undefined') return []
+  try {
+    const saved = localStorage.getItem('nande_custom_characters')
+    return saved ? JSON.parse(saved) : []
+  } catch {
+    return []
+  }
+}
+
 export const useStoryStore = create<StoryState>()(
   temporal((set, get) => ({
     arcs: [],
@@ -96,6 +130,7 @@ export const useStoryStore = create<StoryState>()(
     userId: getUserId(),
     lastLocalEdit: 0,
     isSyncing: false,
+    customCharacters: getInitialCustomCharacters(),
 
     loadArcs: async (force = false) => {
       const state = get()
@@ -325,6 +360,54 @@ export const useStoryStore = create<StoryState>()(
     getEdges: () => {
       const state = get()
       return state.arcGraphs[state.currentArcId]?.edges || []
+    },
+
+    getCharacters: () => {
+      const state = get()
+      return [...DEFAULT_CHARACTERS, ...(state.customCharacters || [])]
+    },
+
+    addCustomCharacter: (name: string, color: string) => {
+      const trimmedName = name.trim()
+      if (!trimmedName) return
+      
+      const current = get().customCharacters || []
+      // Don't add duplicate names if already exists
+      const allExisting = [...DEFAULT_CHARACTERS, ...current]
+      if (allExisting.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
+        return
+      }
+
+      const newChar: Character = {
+        name: trimmedName,
+        color: color || '#3b82f6',
+        isDefault: false
+      }
+
+      const updated = [...current, newChar]
+      set({ customCharacters: updated })
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('nande_custom_characters', JSON.stringify(updated))
+        } catch (e) {
+          console.error('Failed to persist custom characters to localStorage', e)
+        }
+      }
+    },
+
+    removeCustomCharacter: (name: string) => {
+      const current = get().customCharacters || []
+      const updated = current.filter(c => c.name.toLowerCase() !== name.toLowerCase())
+      set({ customCharacters: updated })
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('nande_custom_characters', JSON.stringify(updated))
+        } catch (e) {
+          console.error('Failed to persist custom characters to localStorage', e)
+        }
+      }
     },
 
     onNodesChange: (changes: NodeChange[]) => {
