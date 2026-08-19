@@ -10,7 +10,7 @@ export default function LeftToolbox() {
   
   const characters = [
     { name: 'RedParasite', color: '#ef4444' },
-    { name: 'AJ', color: '#3b82f6' },
+    { name: 'Varadha', color: '#3b82f6' },
     { name: 'Chitty', color: '#60a5fa' },
     { name: 'Sanju', color: '#10b981' },
     { name: 'PR Hashtag', color: '#facc15' },
